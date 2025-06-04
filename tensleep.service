@@ -1,0 +1,12 @@
+[Unit]
+Description=Tensleep
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+ExecStart=/opt/tensleep/tensleep
+WorkingDirectory=/opt/tensleep
+Environment="RUST_BACKTRACE=1"
+Restart=always
+Type=simple
