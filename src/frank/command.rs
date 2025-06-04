@@ -1,21 +1,17 @@
-use std::{fmt::Display, time::Duration};
-
 use jiff::{civil::Time, tz::TimeZone};
-use log::{debug, error};
-use tokio::{
-    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
-    net::UnixStream,
-    time::timeout,
-};
+use log::{error, info};
+use tokio::net::UnixStream;
 
-use crate::settings::VibrationAlarm;
+use crate::{
+    frank::socket::{cbor_transaction, i16_transaction, u16_transaction},
+    settings::VibrationAlarm,
+};
 
 use super::{
     error::FrankError,
+    socket::{cmd_transaction, read_response, write_cmd_for_no_payload},
     state::{FrankSettings, FrankState},
 };
-
-const RESPONSE_TIMEOUT: Duration = Duration::from_secs(2);
 
 const HELLO: u8 = 0;
 const ALARM_LEFT: u8 = 5;
@@ -30,7 +26,7 @@ const STATUS: u8 = 14;
 const ALARM_CLEAR: u8 = 16;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
- #[allow(dead_code)]
+#[allow(dead_code)]
 pub enum FrankCommand {
     Prime,
     ClearAlarm,
@@ -50,112 +46,78 @@ pub enum SideTarget {
 impl FrankCommand {
     pub async fn exec(self, stream: &mut UnixStream) -> Result<(), FrankError> {
         use FrankCommand::*;
-        use SideTarget::*;
 
-        let res = match &self {
-            Prime => trans(stream, PRIME).await?,
-            ClearAlarm => trans(stream, ALARM_CLEAR).await?,
+        match &self {
+            Prime => {
+                info!("[Frank] Requesting to Prime");
+                cmd_transaction(stream, PRIME).await?;
+            },
+            ClearAlarm => {
+                info!("[Frank] Requesting to Clear Alarm");
+                cmd_transaction(stream, ALARM_CLEAR).await?;
+            }
             SetAlarm(side, bx) => {
                 let (alarm, time, tz) = *bx.clone();
+                info!("[Frank] Requesting Alarm at {time}");
                 let cbor = alarm.stamp(time, tz).to_cbor()?;
-                match side {
-                    Left => transpay(stream, ALARM_LEFT, &cbor).await?,
-                    Right => transpay(stream, ALARM_RIGHT, &cbor).await?,
-                    Both => {
-                        transpay(stream, ALARM_LEFT, &cbor).await?;
-                        transpay(stream, ALARM_RIGHT, &cbor).await?
-                    },
+
+                if side.cont_left() {
+                    cbor_transaction(stream, ALARM_LEFT, &cbor).await?;
+                }
+
+                if side.cont_right() {
+                    cbor_transaction(stream, ALARM_RIGHT, &cbor).await?;
                 }
             }
             SetTemp(side, temp, duration) => {
-                match side {
-                    Left => {
-                        transpay(stream, TEMP_DUR_LEFT, &duration.to_string()).await?;
-                        transpay(stream, TEMP_LEFT, &temp.to_string()).await?
-                    },
-                    Right => {
-                        transpay(stream, TEMP_DUR_RIGHT, &duration.to_string()).await?;
-                        transpay(stream, TEMP_RIGHT, &temp.to_string()).await?
-                    },
-                    Both => {
-                        transpay(stream, TEMP_DUR_LEFT, &duration.to_string()).await?;
-                        transpay(stream, TEMP_LEFT, &temp.to_string()).await?;
-                        transpay(stream, TEMP_DUR_RIGHT, &duration.to_string()).await?;
-                        transpay(stream, TEMP_RIGHT, &temp.to_string()).await?
-                    }
+                if side.cont_left() {
+                    info!("[Frank] Left Temp {temp} for {duration} seconds");
+                    u16_transaction(stream, TEMP_DUR_LEFT, *duration).await?;
+                    i16_transaction(stream, TEMP_LEFT, *temp).await?;
+                }
+
+                if side.cont_right() {
+                    info!("[Frank] Right Temp {temp} for {duration} seconds");
+                    u16_transaction(stream, TEMP_DUR_RIGHT, *duration).await?;
+                    i16_transaction(stream, TEMP_RIGHT, *temp).await?;
                 }
             }
             SetSettings(settings) => {
-                let hex = settings.to_cbor()?;
-                transpay(stream, SET_SETTINGS, &hex).await?
+                info!("[Frank] Setting new settings to {settings:#?}");
+                cbor_transaction(stream, SET_SETTINGS, &settings.to_cbor()?).await?
             }
-        };
-
-        debug!("sent {self}, got {res}");
+        }
 
         Ok(())
     }
 }
 
-/// Writes a command (no payload) to Frank and
-/// returns his response if successful
-async fn trans(stream: &mut UnixStream, command: u8) -> Result<String, FrankError> {
-    transaction_bytes(stream, format!("{}\n\n", command).as_bytes()).await
-}
-
-/// Writes a command and payload to Frank and
-/// returns his response if successful
-async fn transpay(
-    stream: &mut UnixStream,
-    command: u8,
-    data: &str,
-) -> Result<String, FrankError> {
-    transaction_bytes(stream, format!("{}\n{}\n\n", command, data).as_bytes()).await
-}
-
-/// Writes a message to Frank, waits RESPONSE_TIMEOUT
-/// for him to respond and gives back his response
-async fn transaction_bytes(stream: &mut UnixStream, bytes: &[u8]) -> Result<String, FrankError> {
-    stream.writable().await?;
-    stream.write(bytes).await?;
-
-    stream.readable().await?;
-    let mut reader = BufReader::new(stream);
-    let read_result = timeout(RESPONSE_TIMEOUT, async {
-        //read until a double newline
-        let mut result = String::new();
-        let mut prev_ended = false;
-        loop {
-            let mut line = String::new();
-            let bytes_read = reader.read_line(&mut line).await?;
-
-            if bytes_read == 0 {
-                return Err(FrankError::UnexpectedEndOfStream);
-            }
-            result.push_str(&line);
-
-            if line == "\n" && prev_ended {
-                break;
-            }
-            prev_ended = line.ends_with('\n');
+/// Says hi a new Frank. If they are unfriendly it returns None
+pub async fn greet(mut stream: UnixStream) -> Option<UnixStream> {
+    match cmd_transaction(&mut stream, HELLO).await {
+        Ok(_) => Some(stream),
+        Err(e) => {
+            error!("[Frank] Unexpected HELLO response: {e}");
+            None
         }
-        Ok(result)
-    })
-    .await;
-
-    match read_result {
-        Ok(result) => result,
-        Err(_) => Err(FrankError::Timeout),
     }
 }
 
 /// Requests a status update from Frank,
 /// returning the parsed result if successful
 pub async fn request_new_state(stream: &mut UnixStream) -> Option<FrankState> {
-    let res = match trans(stream, STATUS).await {
-        Ok(res) => res,
+    if let Err(e) = write_cmd_for_no_payload(stream, STATUS).await {
+        error!("[Frank] Failed to write STATUS command: {e}");
+        return None
+    }
+
+    // FrankState is usually 230-245 bytes, head I'm leaving
+    // some head room because I reallly dont want this to fail
+    let mut buf = Vec::with_capacity(272);
+    let res = match read_response(stream, &mut buf).await {
+        Ok(s) => s,
         Err(e) => {
-            error!("get state command failed: {e}");
+            error!("[Frank] Get status update command failed: {e}");
             return None;
         }
     };
@@ -163,7 +125,7 @@ pub async fn request_new_state(stream: &mut UnixStream) -> Option<FrankState> {
     let new_state = match FrankState::parse(res) {
         Ok(state) => state,
         Err(e) => {
-            error!("frank state failed to parse: {e}");
+            error!("[Frank] FrankState failed to parse: {e}");
             return None;
         }
     };
@@ -171,30 +133,20 @@ pub async fn request_new_state(stream: &mut UnixStream) -> Option<FrankState> {
     Some(new_state)
 }
 
-/// Says hi a new Frank. If they are unfriendly it returns None
-pub async fn greet(mut stream: UnixStream) -> Option<UnixStream> {
-    match trans(&mut stream, HELLO).await {
-        Ok(s) if s.contains("ok") => Some(stream),
-        Ok(s) => {
-            error!("new Frank is unfriendly, stating: {s}");
-            None
-        }
-        Err(e) => {
-            error!("new Frank ignored us: {e}");
-            None
+impl SideTarget {
+    fn cont_left(&self) -> bool {
+        use SideTarget::*;
+        match self {
+            Left | Both => true,
+            Right => false,
         }
     }
-}
 
-impl Display for FrankCommand {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use FrankCommand::*;
+    fn cont_right(&self) -> bool {
+        use SideTarget::*;
         match self {
-            Prime => write!(f, "Prime"),
-            ClearAlarm => write!(f, "ClearAlarm"),
-            SetAlarm(..) => write!(f, "SetAlarm"),
-            SetTemp(..) => write!(f, "SetTemp"),
-            SetSettings(..) => write!(f, "SetSettings"),
+            Right | Both => true,
+            Left => false,
         }
     }
 }

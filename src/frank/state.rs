@@ -16,7 +16,8 @@ pub struct FrankState {
     /// How long the target temperture will last
     /// for in seconds for each side of the bed
     pub tar_temp_time: BedTempTime,
-    /// Example "20600-0001-F00-0001089C"
+    /// "20600-0001-F00-0001089C" when running
+    /// "ul" when not running
     pub sensor_label: String,
     pub water_level: bool,
     /// Whether the bed is priming or not
@@ -26,14 +27,18 @@ pub struct FrankState {
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, Clone)]
 pub struct FrankSettings {
-    #[serde(rename = "v")]
     pub version: u8,
-    #[serde(rename = "gl")]
     pub gain_left: u16,
-    #[serde(rename = "gr")]
     pub gain_right: u16,
-    #[serde(rename = "lb")]
     pub led_brightness_perc: u8,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Default, Clone)]
+struct FrankSettingsCbor {
+    pub v: u8,
+    pub gl: u16,
+    pub gr: u16,
+    pub lb: u8,
 }
 
 /// Temp is offset from "neutral" temperature, °C*10 (IE -40 -> -4°C)
@@ -106,14 +111,38 @@ impl FrankState {
 
 impl FrankSettings {
     pub fn from_cbor(data: &str) -> Result<Self, FrankError> {
+        let res = FrankSettingsCbor::from_cbor(data)?;
+        Ok(Self {
+            version: res.v,
+            gain_left: res.gl,
+            gain_right: res.gr,
+            led_brightness_perc: res.lb,
+        })
+    }
+
+    pub fn to_cbor(&self) -> Result<Vec<u8>, FrankError> {
+        FrankSettingsCbor {
+            v: self.version,
+            gl: self.gain_left,
+            gr: self.gain_right,
+            lb: self.led_brightness_perc,
+        }
+        .to_cbor()
+    }
+}
+
+impl FrankSettingsCbor {
+    pub fn from_cbor(data: &str) -> Result<Self, FrankError> {
         let bytes = hex::decode(data)?;
         Ok(ciborium::from_reader(&bytes[..])?)
     }
 
-    pub fn to_cbor(&self) -> Result<String, FrankError> {
-        let mut buffer = Vec::<u8>::new();
-        ciborium::into_writer(&self, &mut buffer)?;
-        Ok(hex::encode_upper(buffer))
+    pub fn to_cbor(&self) -> Result<Vec<u8>, FrankError> {
+        let mut cbor_buf = Vec::<u8>::new();
+        ciborium::into_writer(&self, &mut cbor_buf)?;
+        let mut buf = vec![0u8; cbor_buf.len() * 2];
+        hex::encode_to_slice(&cbor_buf, &mut buf)?;
+        Ok(buf)
     }
 }
 
@@ -138,27 +167,29 @@ mod tests {
 
     #[test]
     fn test_settings_serialize() {
+        let actual = FrankSettings {
+            version: 1,
+            gain_right: 400,
+            gain_left: 400,
+            led_brightness_perc: 100,
+        }
+        .to_cbor()
+        .unwrap();
+
         assert_eq!(
-            FrankSettings {
-                version: 1,
-                gain_right: 400,
-                gain_left: 400,
-                led_brightness_perc: 100,
-            }
-            .to_cbor()
-            .unwrap(),
+            actual,
             // NOTE: this test string looks different because
             // ciborium is encoding a defined length (A4) map
             // versus frank is defining an indefinte length
             // map BF -- FF
             // This is totally fine and frank will happily
             // parse the defined length map
-            "A461760162676C190190626772190190626C621864"
+            b"a461760162676c190190626772190190626c621864".to_vec()
         );
     }
 
     #[test]
-    fn test_frank_variables() {
+    fn test_frank_state() {
         let inp = r#"tgHeatLevelR = 100
 tgHeatLevelL = 100
 heatTimeL = 0

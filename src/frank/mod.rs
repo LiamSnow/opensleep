@@ -8,16 +8,17 @@ use tokio::{
     fs,
     net::{UnixListener, UnixStream},
     sync::{mpsc, RwLock},
-    time::sleep,
+    time::interval,
 };
 
 pub mod command;
 pub mod error;
 pub mod state;
 pub mod vibration;
+mod socket;
 
 const SOCKET_PATH: &str = "/deviceinfo/dac.sock";
-const UPDATE_STATE_INT: Duration = Duration::from_secs(20);
+const UPDATE_STATE_INT: Duration = Duration::from_secs(10);
 
 pub type FrankStateLock = Arc<RwLock<FrankState>>;
 
@@ -41,6 +42,7 @@ pub async fn run() -> Result<(mpsc::Sender<FrankCommand>, FrankStateLock), Frank
         }
     };
 
+    info!("[Frank] Ready! Spawning thread");
     tokio::spawn(task(listener, stream, cmd_rx, state_lock.clone()));
 
     Ok((cmd_tx, state_lock))
@@ -52,6 +54,7 @@ async fn task(
     mut cmd_rx: mpsc::Receiver<FrankCommand>,
     state_lock: FrankStateLock,
 ) {
+    let mut interval = interval(UPDATE_STATE_INT);
     loop {
         tokio::select! {
             new_stream = accept_new_frank(&mut listener) => {
@@ -63,12 +66,13 @@ async fn task(
             cmd = cmd_rx.recv() => {
                 if let Some(cmd) = cmd {
                     if let Err(e) = cmd.exec(&mut stream).await {
-                        log::error!("error executing frank cmd: {e}")
+                        log::error!("[Frank] Error exec cmd: {e}")
                     }
                 }
             }
 
-            _ = sleep(UPDATE_STATE_INT) => {
+            // first tick happens immediately
+            _ = interval.tick() => {
                 if let Some(new_state) = command::request_new_state(&mut stream).await {
                     let mut state = state_lock.write().await;
                     *state = new_state;
@@ -82,8 +86,14 @@ async fn task(
 async fn remove_socket() -> Result<(), FrankError> {
     let a = fs::remove_file(SOCKET_PATH).await;
     match a {
-        Ok(_) => Ok(()),
-        Err(e) if e.kind() == ErrorKind::NotFound => Ok(()),
+        Ok(_) => {
+            info!("[Frank] Did not have old socket");
+            Ok(())
+        }
+        Err(e) if e.kind() == ErrorKind::NotFound => {
+            info!("[Frank] Removed old socket");
+            Ok(())
+        }
         Err(e) => Err(FrankError::RemoveSocket(e)),
     }
 }
@@ -91,11 +101,11 @@ async fn remove_socket() -> Result<(), FrankError> {
 async fn accept_new_frank(listener: &mut UnixListener) -> Option<UnixStream> {
     match listener.accept().await {
         Ok((stream, _)) => {
-            info!("new frank found in the wild");
+            info!("[Frank] New Frank found in the wild");
             command::greet(stream).await
         }
         Err(e) => {
-            log::error!("new frank failed accepting connection: {e}");
+            log::error!("[Frank] New Frank did not work out: {e}");
             None
         }
     }

@@ -912,6 +912,7 @@ dependencies = [
  "actix-web",
  "ciborium",
  "hex",
+ "itoa",
  "jiff",
  "log",
  "paste",

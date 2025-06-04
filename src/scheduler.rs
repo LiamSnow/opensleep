@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use jiff::{civil::Time, tz::TimeZone, SignedDuration, Timestamp, ToSpan, Unit, Zoned};
-use log::error;
+use log::{error, info};
 use thiserror::Error;
 use tokio::{sync::{
     mpsc,
@@ -22,6 +22,8 @@ pub enum SchedulerError {
     Jiff(#[from] jiff::Error),
 }
 
+/// This function tries to never crash, unless there is Jiff error, in which case we want to crash
+/// (either its a core issue that needs to be fixed or a configuration issue)
 pub async fn run(frank_tx: mpsc::Sender<FrankCommand>, mut cfg_rx: Receiver<Settings>) -> Result<(), SchedulerError> {
     loop {
         let cfg = cfg_rx.borrow_and_update();
@@ -34,7 +36,7 @@ pub async fn run(frank_tx: mpsc::Sender<FrankCommand>, mut cfg_rx: Receiver<Sett
                 led_brightness_perc: bri,
             }))).await;
             if let Err(e) = res {
-                error!("Frank channel error {e}");
+                error!("[Scheduler] Frank channel error {e}");
             }
         }
 
@@ -52,7 +54,7 @@ pub async fn run(frank_tx: mpsc::Sender<FrankCommand>, mut cfg_rx: Receiver<Sett
                             _ = tokio::time::sleep(dur) => {
                                 let res = frank_tx.send(cmd.clone()).await;
                                 if let Err(e) = res {
-                                    error!("Frank channel error {e}");
+                                    error!("[Scheduler] Frank channel error {e}");
                                 }
                                 next = next.checked_add(1.day())?;
                             }
@@ -83,6 +85,8 @@ fn make_schedule(cfg: Ref<'_, Settings>) -> Result<Vec<(Zoned, FrankCommand)>, S
     let mut res = Vec::new();
 
     let now = Timestamp::now().to_zoned(cfg.timezone.clone());
+
+    info!("[Scheduler] Making schedule at {now}");
 
     if let Some(prime_time) = cfg.prime {
         let mut prime_dt = now.with().time(prime_time).build()?;
@@ -128,6 +132,8 @@ fn schedule_side(
             FrankCommand::SetTemp(tar.clone(), heat.temp, heat.offset),
         ));
     }
+
+    info!("[Scheduler] Result for {tar:?}: sleep at {sleep_dt}, wake at {wake_dt}");
 
     calc_profile(res, tar, &cfg.temp_profile, sleep_dt, wake_dt)?;
 
@@ -184,6 +190,8 @@ fn calc_profile(
     let sleep_period = sleep_dt.until(&wake_dt)?.total(Unit::Second)? as i64;
     let step_len = SignedDuration::from_secs(sleep_period / prof.len() as i64);
     let step_len_secs = step_len.as_secs() as u16;
+
+    info!("[Scheduler] Result for {tar:?}: sleep period {sleep_period} seconds with each step {step_len_secs} seconds");
 
     for (i, temp) in prof.iter().enumerate() {
         let dt = sleep_dt.checked_add(step_len * i as i32)?;

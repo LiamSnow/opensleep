@@ -34,4 +34,6 @@ pub enum FrankError {
     VarMissing(String),
     #[error("failed to parse variable `{0}`")]
     VarFailedParse(String),
+    #[error(r#"expected frank to say "ok" but got `{0}`"#)]
+    ExpectedOk(String),
 }
