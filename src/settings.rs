@@ -1,65 +1,81 @@
-use anyhow::{anyhow, bail, Context};
-use chrono::NaiveTime;
-use chrono_tz::Tz;
-use regex::Regex;
+use actix_web::{body::BoxBody, HttpRequest, HttpResponse, Responder, ResponseError};
+use jiff::{civil::Time, tz::TimeZone};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use serde_json::{json, Value};
-use std::{fs, str::FromStr};
+use serde_json;
+use std::{fs, io, num::ParseIntError, str::FromStr};
+use thiserror::Error;
 
-const TIME_FORMAT: &str = "%I:%M %p";
-
-pub type TempProfile = [i32; 3];
-
-#[derive(Debug, Clone)]
-pub struct WatchedTenSettings {
-    change_number: u32,
-    pub settings: TenSettings
+#[derive(Error, Debug)]
+pub enum SettingsError {
+    #[error("file io: `{0}`")]
+    File(#[from] io::Error),
+    #[error("json: `{0}`")]
+    Json(#[from] serde_json::Error),
+    #[error("parse int: `{0}`")]
+    ParseInt(#[from] ParseIntError),
+    #[error(r#"invalid vibration pattern: `{0}`, espected "double" or "rise""#)]
+    InvalidVibrationPattern(String),
+    #[error(
+        "the settings are currently in Couples mode, use `/left` or `/right` prefixes not `/both`"
+    )]
+    NotCouples,
+    #[error(
+        "the settings are currently in Solo mode, use `/both` prefix not `/left` or `/right`"
+    )]
+    NotSolo,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct TenSettings {
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Settings {
+    #[serde(deserialize_with = "timezone_de", serialize_with = "timezone_ser")]
+    pub timezone: TimeZone,
+    #[serde(default)]
+    pub away_mode: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prime: Option<Time>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub led_brightness: Option<u8>,
+    #[serde(flatten)]
+    pub by_side: BySideSettings,
+    // TODO nap mode
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum BySideSettings {
+    Couples {
+        left: SideSettings,
+        right: SideSettings,
+    },
+    Solo {
+        both: SideSettings,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SideSettings {
     ///offset from "neutral" temperature, °C*10 (IE -40 -> -4°C)
-    pub temp_profile: TempProfile,
-    pub time_zone: Tz,
-    #[serde(
-        deserialize_with = "deserialize_time",
-        serialize_with = "serialize_time"
-    )]
-    pub sleep_time: NaiveTime,
-    pub alarm: AlarmSettings,
+    pub temp_profile: Vec<i16>,
+    pub sleep: Time,
+    pub wake: Time,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vibration: Option<VibrationAlarm>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub heat: Option<HeatAlarm>,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct AlarmSettings {
-    #[serde(
-        deserialize_with = "deserialize_time",
-        serialize_with = "serialize_time"
-    )]
-    pub time: NaiveTime,
-    pub vibration: Option<VibrationSettings>,
-    pub heat: Option<HeatSettings>,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct VibrationSettings {
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct VibrationAlarm {
     pub pattern: VibrationPattern,
     ///0-100
     pub intensity: u8,
     ///seconds
     pub duration: u16,
-    ///seconds before alarm time
+    ///seconds before sleep
     pub offset: u16,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct VibrationEvent {
-    pub pl: u8,
-    pub du: u16,
-    pub pi: String,
-    pub tt: u64,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum VibrationPattern {
     ///heavy
@@ -68,97 +84,58 @@ pub enum VibrationPattern {
     Rise,
 }
 
-#[derive(Debug, Deserialize, Clone, Serialize)]
-pub struct HeatSettings {
-    pub temp: i32,
-    ///seconds before alarm time
+#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
+pub struct HeatAlarm {
+    pub temp: i16,
+    ///seconds before sleep
     pub offset: u16,
 }
 
-
-impl WatchedTenSettings {
-    pub fn new(settings: TenSettings) -> Self {
-        Self { settings, change_number: 0 }
+impl Settings {
+    pub fn from_file(path: &str) -> Result<Self, SettingsError> {
+        let file_contents = fs::read_to_string(path)?;
+        Self::from_str(&file_contents)
     }
 
-    pub fn mark(&mut self) {
-        self.change_number += 1;
-    }
-
-    pub fn get_change_number(&self) -> u32 {
-        self.change_number
-    }
-
-    pub fn change(&mut self, new_settings: TenSettings) {
-        self.settings = new_settings;
-        self.mark();
-    }
-}
-
-impl PartialEq for WatchedTenSettings {
-    fn eq(&self, other: &Self) -> bool {
-        self.change_number == other.change_number
-    }
-}
-
-impl TenSettings {
-    pub fn from_file(path: &str) -> anyhow::Result<Self> {
-        let file_contents = fs::read_to_string(path).context("Reading settings file")?;
-        Self::from_str(&file_contents).context("Parsing settings file")
-    }
-
-    pub fn from_str(json: &str) -> anyhow::Result<Self> {
+    pub fn from_str(json: &str) -> Result<Self, SettingsError> {
         Ok(serde_json::from_str(json)?)
     }
 
-    pub fn serialize(&self) -> anyhow::Result<String> {
+    pub fn serialize(&self) -> Result<String, SettingsError> {
         Ok(serde_json::to_string(self)?)
     }
 
-    pub fn save(&self, path: &str) -> anyhow::Result<()> {
+    pub fn save(&self, path: &str) -> Result<(), SettingsError> {
         let json = self.serialize()?;
         Ok(fs::write(path, json)?)
     }
-}
 
-fn parse_temp_profile(s: &str) -> anyhow::Result<TempProfile> {
-    let re = Regex::new(r"[\[\]{}()]").unwrap();
-    let s = re.replace_all(s, "");
-    let s_clear = s.replace(" ", "");
-
-    let elements: Vec<&str> = if s.contains(',') {
-        s_clear.split(',')
-    }
-    else if s.contains(';') {
-        s_clear.split(';')
-    }
-    else {
-        s.split(' ')
-    }.collect();
-
-    if elements.len() != 3 {
-        bail!("Wrong amount of elements in temp_profile")
-    }
-
-    Ok([elements[0].parse()?, elements[1].parse()?, elements[2].parse()?])
-}
-
-impl VibrationSettings {
-    pub fn make_event(&self, timestamp: u64) -> VibrationEvent {
-        VibrationEvent {
-            pl: self.intensity,
-            du: self.duration,
-            pi: self.pattern.to_string(),
-            tt: timestamp,
+    pub fn as_couples_mut(&mut self) -> Result<(&mut SideSettings, &mut SideSettings), SettingsError> {
+        match &mut self.by_side {
+            BySideSettings::Couples { left, right } => Ok((left, right)),
+            _ => Err(SettingsError::NotSolo),
         }
     }
-}
 
-impl VibrationEvent {
-    pub fn to_cbor(&self) -> String {
-        let mut buffer = Vec::<u8>::new();
-        ciborium::into_writer(&self, &mut buffer).unwrap();
-        hex::encode(buffer)
+    pub fn as_solo_mut(&mut self) -> Result<&mut SideSettings, SettingsError> {
+        match &mut self.by_side {
+            BySideSettings::Solo { both } => Ok(both),
+            _ => Err(SettingsError::NotCouples),
+        }
+    }
+
+    pub fn as_couples(&self) -> Result<(&SideSettings, &SideSettings), SettingsError> {
+        match &self.by_side {
+            BySideSettings::Couples { left, right } => Ok((left, right)),
+            _ => Err(SettingsError::NotSolo),
+        }
+    }
+
+    pub fn as_solo(&self) -> Result<&SideSettings, SettingsError> {
+        match &self.by_side {
+            BySideSettings::Solo { both } => Ok(both),
+            _ => Err(SettingsError::NotCouples),
+        }
     }
 }
 
@@ -173,136 +150,33 @@ impl VibrationPattern {
 }
 
 impl FromStr for VibrationPattern {
-    type Err = anyhow::Error;
+    type Err = SettingsError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "double" => Ok(Self::Double),
             "rise" => Ok(Self::Rise),
-            _ => Err(anyhow!("Invalid vibration pattern")),
+            _ => Err(SettingsError::InvalidVibrationPattern(s.to_string())),
         }
     }
 }
 
-fn deserialize_time<'de, D: Deserializer<'de>>(deserializer: D) -> Result<NaiveTime, D::Error> {
-    let time_str = String::deserialize(deserializer)?;
-    NaiveTime::parse_from_str(&time_str, TIME_FORMAT)
-        .or_else(|_| NaiveTime::parse_from_str(&time_str, "%H:%M"))
+fn timezone_de<'de, D: Deserializer<'de>>(deserializer: D) -> Result<TimeZone, D::Error> {
+    let tzname = String::deserialize(deserializer)?;
+    TimeZone::get(&tzname)
         .map_err(serde::de::Error::custom)
 }
 
-fn parse_time(time_str: &str) -> anyhow::Result<NaiveTime> {
-    Ok(NaiveTime::parse_from_str(&time_str, TIME_FORMAT)
-        .or_else(|_| NaiveTime::parse_from_str(&time_str, "%H:%M"))?)
+fn timezone_ser<S: Serializer>(tz: &TimeZone, serializer: S) -> Result<S::Ok, S::Error> {
+    serializer.serialize_str(tz.iana_name().unwrap())
 }
 
-fn serialize_time<S: Serializer>(time: &NaiveTime, serializer: S) -> Result<S::Ok, S::Error> {
-    serializer.serialize_str(&time.format(TIME_FORMAT).to_string())
-}
+impl Responder for SettingsError {
+    type Body = BoxBody;
 
-pub trait ByPath {
-    fn get_at_path(&self, path: Vec<&str>) -> anyhow::Result<Option<Value>>;
-    fn set_at_path(&mut self, path: Vec<&str>, value: String) -> anyhow::Result<()>;
-}
-
-impl ByPath for TenSettings {
-    fn get_at_path(&self, path: Vec<&str>) -> anyhow::Result<Option<Value>> {
-        if path.len() < 1 { bail!("Path is too short"); }
-        Ok(match path[0] {
-            "temp_profile" => Some(json!(self.temp_profile)),
-            "time_zone" => Some(json!(self.time_zone.to_string())),
-            "sleep_time" => Some(json!(self.sleep_time.format(TIME_FORMAT).to_string())),
-            "alarm" => self.alarm.get_at_path(path[1..].to_vec())?,
-            _ => bail!("Invalid path for settings"),
-        })
-    }
-
-    fn set_at_path(&mut self, path: Vec<&str>, value: String) -> anyhow::Result<()> {
-        if path.len() < 1 { bail!("Path is too short"); }
-        match path[0] {
-            "temp_profile" => self.temp_profile = parse_temp_profile(&value)?,
-            "time_zone" => self.time_zone = Tz::from_str_insensitive(&value)?,
-            "sleep_time" => self.sleep_time = parse_time(&value)?,
-            "alarm" => self.alarm.set_at_path(path[1..].to_vec(), value)?,
-            _ => bail!("Invalid path for settings"),
-        }
-
-        Ok(())
+    fn respond_to(self, _: &HttpRequest) -> HttpResponse<Self::Body> {
+        HttpResponse::InternalServerError().body(self.to_string())
     }
 }
 
-impl ByPath for AlarmSettings {
-    fn get_at_path(&self, path: Vec<&str>) -> anyhow::Result<Option<Value>> {
-        if path.len() < 1 { bail!("Path is too short"); }
-        Ok(match path[0] {
-            "time" => Some(json!(self.time.format(TIME_FORMAT).to_string())),
-            "vibration" => self.vibration.as_ref().and_then(|vib| vib.get_at_path(path[1..].to_vec()).ok().flatten()),
-            "heat" => self.heat.as_ref().and_then(|heat| heat.get_at_path(path[1..].to_vec()).ok().flatten()),
-            _ => bail!("Invalid path for alarm setting"),
-        })
-    }
-
-    fn set_at_path(&mut self, path: Vec<&str>, value: String) -> anyhow::Result<()> {
-        if path.len() < 1 { bail!("Path is too short"); }
-        match path[0] {
-            "time" => self.time = parse_time(&value)?,
-            "vibration" => match &mut self.vibration {
-                Some(vib) => vib.set_at_path(path[1..].to_vec(), value)?,
-                None => bail!("Cannot partially modify vibration settings, as it does not exist"),
-            },
-            "heat" => match &mut self.heat {
-                Some(heat) => heat.set_at_path(path[1..].to_vec(), value)?,
-                None => bail!("Cannot partially modify heat settings, as it does not exist"),
-            },
-            _ => bail!("Invalid path for alarm setting"),
-        }
-        Ok(())
-    }
-}
-
-impl ByPath for VibrationSettings {
-    fn get_at_path(&self, path: Vec<&str>) -> anyhow::Result<Option<Value>> {
-        if path.len() < 1 { bail!("Path is too short"); }
-        Ok(Some(match path[0] {
-            "pattern" => json!(self.pattern),
-            "intensity" => json!(self.intensity),
-            "duration" => json!(self.duration),
-            "offset" => json!(self.offset),
-            _ => bail!("Invalid path for vibration setting"),
-        }))
-    }
-
-    fn set_at_path(&mut self, path: Vec<&str>, value: String) -> anyhow::Result<()> {
-        if path.len() < 1 { bail!("Path is too short"); }
-        match path[0] {
-            "pattern" => self.pattern = value.parse()?,
-            "intensity" => self.intensity = value.parse()?,
-            "duration" => self.duration = value.parse()?,
-            "offset" => self.offset = value.parse()?,
-            _ => bail!("Invalid path for vibration setting"),
-        }
-        Ok(())
-    }
-}
-
-impl ByPath for HeatSettings {
-    fn get_at_path(&self, path: Vec<&str>) -> anyhow::Result<Option<Value>> {
-        if path.len() < 1 { bail!("Path is too short"); }
-        Ok(match path[0] {
-            "temp" => Some(json!(self.temp)),
-            "offset" => Some(json!(self.offset)),
-            _ => bail!("Invalid path for heat setting"),
-        })
-    }
-
-    fn set_at_path(&mut self, path: Vec<&str>, value: String) -> anyhow::Result<()> {
-        if path.len() < 1 { bail!("Path is too short"); }
-        match path[0] {
-            "temp" => self.temp = value.parse()?,
-            "offset" => self.offset = value.parse()?,
-            _ => bail!("Invalid path for heat setting"),
-        }
-        Ok(())
-    }
-}
-
+impl ResponseError for SettingsError {}

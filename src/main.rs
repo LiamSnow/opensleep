@@ -1,28 +1,39 @@
-use anyhow::Context;
-use axum::{extract::{Path, State}, http::StatusCode, response::IntoResponse, routing::get, Json, Router};
-use frank::FrankStream;
-use log::{info, LevelFilter};
-use serde_json::{json, Value};
-use settings::{WatchedTenSettings, TenSettings, ByPath};
+use frank::error::FrankError;
+use log::{info, LevelFilter, SetLoggerError};
+use scheduler::SchedulerError;
+use settings::{Settings, SettingsError};
 use simplelog::{ColorChoice, CombinedLogger, TermLogger, TerminalMode, WriteLogger};
-use std::{fs::File, sync::Arc};
-use tokio::sync::RwLock;
+use thiserror::Error;
+use std::{fs::File, io};
+use tokio::sync::watch;
 
 mod frank;
 mod scheduler;
 mod settings;
 mod test;
+mod api;
 
-const SETTINGS_FILE: &str = "settings.json";
-const LOG_FILE: &str = "tensleep.log";
+pub const SETTINGS_FILE: &str = "settings.json";
+const LOG_FILE: &str = "opensleep.log";
 
-struct AppState {
-    dac: Arc<FrankStream>,
-    settings: Arc<RwLock<WatchedTenSettings>>,
+#[derive(Error, Debug)]
+pub enum MainError {
+    #[error("api error: `{0}`")]
+    API(#[from] io::Error),
+    #[error("log file creation error: `{0}`")]
+    LogFileCreation(io::Error),
+    #[error("set logger error: `{0}`")]
+    SetLogger(#[from] SetLoggerError),
+    #[error("frank error: `{0}`")]
+    Frank(#[from] FrankError),
+    #[error("scheduler error: `{0}`")]
+    Scheduler(#[from] SchedulerError),
+    #[error("settings error: `{0}`")]
+    Settings(#[from] SettingsError),
 }
 
-#[tokio::main]
-async fn main() {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<(), MainError> {
     CombinedLogger::init(vec![
         TermLogger::new(
             LevelFilter::Debug,
@@ -33,189 +44,22 @@ async fn main() {
         WriteLogger::new(
             LevelFilter::Debug,
             simplelog::Config::default(),
-            File::create(LOG_FILE).context("Making log file").unwrap(),
+            File::create(LOG_FILE)
+                .map_err(|e| MainError::LogFileCreation(e))?,
         ),
-    ])
-    .context("Making combined logger")
-    .unwrap();
+    ])?;
 
-    info!("Tensleep started. Connecting to frankenfirmware...");
-    let dac = FrankStream::spawn().await.unwrap();
+    info!("Open Sleep started. Finding a Frank...");
+    let (frank_tx, frank_state) = frank::run().await?;
 
     info!("Reading settings file: {SETTINGS_FILE}");
-    let init_settings = TenSettings::from_file(SETTINGS_FILE).unwrap();
-    let settings = Arc::new(RwLock::new(WatchedTenSettings::new(init_settings)));
+    let (settings_tx, settings_rx) = watch::channel(Settings::from_file(SETTINGS_FILE)?);
+
+    info!("Starting API server");
+    api::run(frank_state, settings_tx, settings_rx.clone()).await?;
 
     info!("Spawning scheduler thread...");
-    scheduler::spawn(dac.clone(), settings.clone());
+    scheduler::run(frank_tx, settings_rx).await?;
 
-    let state = Arc::new(AppState { dac, settings });
-
-    info!("Creating Axum router");
-    let app = Router::new()
-        .route("/health", get(get_health))
-        .route("/state", get(get_state))
-        .route("/settings", get(get_settings).post(post_settings))
-        .route("/setting/*path", get(get_setting).post(post_setting))
-        .route("/prime", get(prime).post(prime))
-        .fallback(get_lost)
-        .with_state(state);
-
-    info!("Spawning Axum");
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
-    axum::serve(listener, app.into_make_service())
-        .await
-        .context("Serving Axum")
-        .unwrap();
-}
-
-async fn get_lost() -> impl IntoResponse {
-    (StatusCode::NOT_FOUND, "404 Not Found")
-}
-
-async fn get_state(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    let variables = state.dac.get_state().await;
-    if let Err(e) = variables {
-        return (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({
-                "error": "Failed to get state",
-                "details": e.to_string()
-            })),
-        ).into_response()
-    }
-    match variables.unwrap().serialize() {
-        Ok(serialized) => Json(serialized).into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({
-                "error": "Failed to serialize state",
-                "details": e.to_string()
-            })),
-        ).into_response(),
-    }
-}
-
-async fn get_health(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    if state.dac.ping().await.is_ok() {
-        (
-            StatusCode::OK,
-            Json(json!({
-              "status": "OK"
-            })),
-        ).into_response()
-    } else {
-        (
-            StatusCode::SERVICE_UNAVAILABLE,
-            Json(json!({
-              "status": "UNAVAILABLE"
-            })),
-        ).into_response()
-    }
-}
-
-async fn prime(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    match state.dac.prime().await {
-        Ok(r) => (
-            StatusCode::OK,
-            Json(json!({
-              "response": r
-            })),
-        ).into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({
-              "error": e.to_string()
-            })),
-        ).into_response()
-    };
-}
-
-async fn get_settings(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    let settings = state.settings.read().await;
-    match settings.settings.serialize() {
-        Ok(serialized) => Json(serialized).into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({
-                "error": "Failed to serialize settings",
-                "details": e.to_string()
-            })),
-        ).into_response(),
-    }
-}
-
-async fn get_setting(
-    State(state): State<Arc<AppState>>,
-    Path(path): Path<String>,
-) -> impl IntoResponse {
-    let settings = state.settings.read().await;
-    info!("API: get setting {}", path);
-    match settings.settings.get_at_path(path.split('/').collect()) {
-        Ok(Some(value)) => Json(value).into_response(),
-        Ok(None) => Json(Value::Null).into_response(),
-        Err(e) => (
-            StatusCode::BAD_REQUEST,
-            Json(json!({
-                "error": e.to_string()
-            }))
-        ).into_response(),
-    }
-}
-
-async fn post_settings(
-    State(state): State<Arc<AppState>>,
-    Json(new_settings): Json<TenSettings>,
-) -> impl IntoResponse {
-    info!("API: set settings to {new_settings:#?}");
-    let mut settings = state.settings.write().await;
-    //TODO TODO TODO TODO MAKE A CHANNEL
-    settings.change(new_settings.clone());
-
-    match new_settings.save(SETTINGS_FILE) {
-        Ok(_) => Json(json!({
-            "message": "Settings updated successfully",
-            "settings": new_settings
-        })).into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({
-                "error": "Failed to save settings",
-                "details": e.to_string()
-            })),
-        ).into_response(),
-    }
-}
-
-async fn post_setting(
-    State(state): State<Arc<AppState>>,
-    Path(path): Path<String>,
-    value: String,
-) -> impl IntoResponse {
-    let mut settings = state.settings.write().await;
-    info!("API: setting setting {} to {}", path, value);
-    let res = settings.settings.set_at_path(path.split('/').collect(), value.to_string());
-    settings.mark();
-    if let Err(e) = res {
-        return (
-            StatusCode::BAD_REQUEST,
-            Json(json!({
-                "error": e.to_string(),
-            })),
-        ).into_response()
-    }
-
-    match settings.settings.save(SETTINGS_FILE) {
-        Ok(_) => Json(json!({
-            "message": "Setting updated successfully",
-            "settings": settings.settings
-        })).into_response(),
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({
-                "error": "Failed to save settings",
-                "details": e.to_string()
-            })),
-        ).into_response(),
-    }
+    Ok(())
 }
