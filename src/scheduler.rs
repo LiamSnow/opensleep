@@ -3,10 +3,10 @@ use std::time::Duration;
 use jiff::{civil::Time, tz::TimeZone, SignedDuration, Timestamp, ToSpan, Unit, Zoned};
 use log::error;
 use thiserror::Error;
-use tokio::sync::{
+use tokio::{sync::{
     mpsc,
     watch::{Receiver, Ref},
-};
+}, time::interval};
 
 use crate::{
     frank::{
@@ -63,6 +63,16 @@ pub async fn run(frank_tx: mpsc::Sender<FrankCommand>, mut cfg_rx: Receiver<Sett
                     } else {
                         next = next.checked_add(1.day())?;
                     }
+                }
+            }
+        } else {
+            // borrow checker being hella annoying
+            // here so this is my fix
+            let mut interval = interval(Duration::from_secs(3));
+            loop {
+                interval.tick().await;
+                if cfg.has_changed() {
+                    break
                 }
             }
         }
