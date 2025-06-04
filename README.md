@@ -33,7 +33,7 @@ and the [ninesleep instructions](https://github.com/bobobo1618/ninesleep?tab=rea
 Build with:
 
 ```bash
-cargo build --target aarch64-unknown-linux-musl
+cargo build --target aarch64-unknown-linux-musl --release
 ```
 
 1.  Create a `settings.json` (see examples `example_couples.json` and `example_solo.json`)

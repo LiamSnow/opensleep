@@ -12,12 +12,14 @@ use crate::{
     SETTINGS_FILE,
 };
 
+const NUM_WORKERS: usize = 1;
+
 pub async fn run(
     frank_state: FrankStateLock,
     settings_tx: Sender<Settings>,
     settings_rx: Receiver<Settings>,
 ) -> std::io::Result<()> {
-    HttpServer::new(move || {
+    let server = HttpServer::new(move || {
         App::new()
             .app_data(Data::new(frank_state.clone()))
             .app_data(Data::new(settings_rx.clone()))
@@ -28,9 +30,12 @@ pub async fn run(
             .service(post_settings)
             .configure(cfg_settings_routes)
     })
-    .bind(("0.0.0.0", 3000))?
-    .run()
-    .await
+    .workers(NUM_WORKERS)
+    .bind(("0.0.0.0", 3000))?;
+
+    tokio::spawn(server.run());
+
+    Ok(())
 }
 
 #[get("/health")]

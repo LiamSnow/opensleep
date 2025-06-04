@@ -174,7 +174,7 @@ pub async fn request_new_state(stream: &mut UnixStream) -> Option<FrankState> {
 /// Says hi a new Frank. If they are unfriendly it returns None
 pub async fn greet(mut stream: UnixStream) -> Option<UnixStream> {
     match trans(&mut stream, HELLO).await {
-        Ok(s) if s.as_str() == "ok" => Some(stream),
+        Ok(s) if s.contains("ok") => Some(stream),
         Ok(s) => {
             error!("new Frank is unfriendly, stating: {s}");
             None
