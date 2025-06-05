@@ -41,12 +41,9 @@ struct FrankSettingsCbor {
     pub lb: u8,
 }
 
-/// Temp is offset from "neutral" temperature, °C*10 (IE -40 -> -4°C)
 #[derive(Debug, PartialEq, Eq, Serialize, Default, Clone)]
 pub struct BedTemp {
-    /// Temp is offset from "neutral" temperature, °C*10 (IE -40 -> -4°C)
     pub left: i16,
-    /// Temp is offset from "neutral" temperature, °C*10 (IE -40 -> -4°C)
     pub right: i16,
 }
 

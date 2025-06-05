@@ -1,14 +1,16 @@
 use std::time::Duration;
 
 use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     net::UnixStream,
     time::timeout,
 };
 
 use super::error::FrankError;
 
-const RESPONSE_TIMEOUT: Duration = Duration::from_secs(2);
+/// sometimes Frank gets stuck, but sending more commands
+/// to him will make him seg fault so its better to wait
+const RESPONSE_TIMEOUT: Duration = Duration::from_secs(360);
 
 /// write a command, read "ok"
 pub async fn cmd_transaction(stream: &mut UnixStream, cmd: u8) -> Result<(), FrankError> {
@@ -49,7 +51,7 @@ pub async fn cbor_transaction(
 /// write `COMMAND\n\n`
 pub async fn write_cmd_for_no_payload(stream: &mut UnixStream, cmd: u8) -> Result<(), FrankError> {
     stream.writable().await?;
-
+    // stream.write(format!("{}\n\n", cmd).as_bytes()).await?;
     let mut buf = itoa::Buffer::new();
     stream.write(buf.format(cmd).as_bytes()).await?;
     write_req_end(stream).await
@@ -72,51 +74,39 @@ pub async fn write_req_end(stream: &mut UnixStream) -> Result<(), FrankError> {
     Ok(())
 }
 
-/// fastpath commmon "ok" response
+/// read response, errors if its not "ok"
 pub async fn read_ok(stream: &mut UnixStream) -> Result<(), FrankError> {
-    let mut buf = [0u8; 4];
-    match timeout(RESPONSE_TIMEOUT, stream.read_exact(&mut buf)).await {
-        Ok(Ok(_)) if &buf == b"ok\n\n" => return Ok(()),
-        Ok(Ok(_)) => {
-            let mut buf = buf.to_vec();
-            let res = read_response(stream, &mut buf).await?;
-            Err(FrankError::ExpectedOk(
-                res.trim_end_matches('\n').to_string(),
-            ))
-        }
-        Ok(Err(e)) => Err(e.into()),
-        Err(_) => Err(FrankError::Timeout),
+    let res = read_response(stream, 4, 3).await?;
+    match res.as_str() {
+        "ok" => Ok(()),
+        _ => Err(FrankError::ExpectedOk(res)),
     }
 }
 
 /// reads a response from Frank in the format `RESPONSE\n\n`
-pub async fn read_response(
-    stream: &mut UnixStream,
-    buf: &mut Vec<u8>,
-) -> Result<String, FrankError> {
+pub async fn read_response(stream: &mut UnixStream, exp_size: usize, max_exp_line: usize) -> Result<String, FrankError> {
+    stream.readable().await?;
+    let mut reader = BufReader::new(stream);
     timeout(RESPONSE_TIMEOUT, async {
-        stream.readable().await?;
-        let mut temp_buf = [0u8; 50];
-
+        let mut result = String::with_capacity(exp_size);
+        let mut prev_ended = false;
         loop {
-            let n = stream.read(&mut temp_buf).await?;
-            if n == 0 {
-                return Err(FrankError::UnexpectedEndOfStream);
+            let mut line = String::with_capacity(max_exp_line);
+            reader.read_line(&mut line).await?;
+
+            if line == "\n" && prev_ended {
+                break;
+            } else {
+                result.push_str(&line);
             }
 
-            buf.extend_from_slice(&temp_buf[..n]);
-
-            if let Some(pos) = find_req_end(&buf) {
-                return Ok(String::from_utf8_lossy(&buf[..pos]).into_owned());
-            }
+            prev_ended = line.contains('\n');
         }
+        result.pop();
+        Ok(result)
     })
     .await
     .map_err(|_| FrankError::Timeout)?
-}
-
-fn find_req_end(buffer: &[u8]) -> Option<usize> {
-    buffer.windows(2).position(|window| window == b"\n\n")
 }
 
 #[cfg(test)]
@@ -129,6 +119,23 @@ mod tests {
     use crate::frank::state::FrankSettings;
 
     use super::*;
+
+    #[tokio::test]
+    async fn test_write_cmd_for_no_payload() {
+        let (mut client, mut server) = UnixStream::pair().unwrap();
+
+        let cmd = 14u8;
+        let expected = format!("{}\n\n", cmd);
+
+        let server_handle = tokio::spawn(async move {
+            let mut buf = vec![0u8; expected.len()];
+            server.read_exact(&mut buf).await.unwrap();
+            assert_eq!(buf, expected.as_bytes());
+        });
+
+        write_cmd_for_no_payload(&mut client, cmd).await.unwrap();
+        server_handle.await.unwrap();
+    }
 
     #[tokio::test]
     async fn test_cmd_transaction() {
@@ -200,7 +207,10 @@ mod tests {
         .to_cbor()
         .unwrap();
 
-        let expected = format!("{}\n{}\n\n", cmd, "a461760162676c190190626772190190626c621864");
+        let expected = format!(
+            "{}\n{}\n\n",
+            cmd, "a461760162676c190190626772190190626c621864"
+        );
 
         let server_handle = tokio::spawn(async move {
             let mut buf = vec![0u8; expected.len()];
@@ -228,10 +238,8 @@ waterLevel = true
 priming = false
 settings = "BF61760162676C190190626772190190626C621864FF""#;
 
-
         let client_handle = tokio::spawn(async move {
-            let mut buf = Vec::with_capacity(272);
-            let actual = read_response(&mut client, &mut buf).await.unwrap();
+            let actual = read_response(&mut client, 260, 60).await.unwrap();
             assert_eq!(expected, actual);
         });
 

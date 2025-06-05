@@ -95,7 +95,10 @@ impl FrankCommand {
 /// Says hi a new Frank. If they are unfriendly it returns None
 pub async fn greet(mut stream: UnixStream) -> Option<UnixStream> {
     match cmd_transaction(&mut stream, HELLO).await {
-        Ok(_) => Some(stream),
+        Ok(_) => {
+            info!("[Frank] New Frank accepted");
+            Some(stream)
+        },
         Err(e) => {
             error!("[Frank] Unexpected HELLO response: {e}");
             None
@@ -111,10 +114,9 @@ pub async fn request_new_state(stream: &mut UnixStream) -> Option<FrankState> {
         return None
     }
 
-    // FrankState is usually 230-245 bytes, head I'm leaving
-    // some head room because I reallly dont want this to fail
-    let mut buf = Vec::with_capacity(272);
-    let res = match read_response(stream, &mut buf).await {
+    // FrankState is usually 230-245 bytes, biggest line
+    // is setting ~57 bytes
+    let res = match read_response(stream, 260, 60).await {
         Ok(s) => s,
         Err(e) => {
             error!("[Frank] Get status update command failed: {e}");

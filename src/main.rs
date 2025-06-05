@@ -10,8 +10,10 @@ use tokio::sync::watch;
 mod frank;
 mod scheduler;
 mod settings;
-mod test;
 mod api;
+
+#[cfg(test)]
+mod test;
 
 pub const SETTINGS_FILE: &str = "settings.json";
 const LOG_FILE: &str = "opensleep.log";
@@ -49,7 +51,7 @@ async fn main() -> Result<(), MainError> {
         ),
     ])?;
 
-    info!("[Main] Open Sleep started");
+    info!("[Main] Open Sleep starting...");
 
     info!("[Main] Reading settings file: {SETTINGS_FILE}");
     let (settings_tx, settings_rx) = watch::channel(Settings::from_file(SETTINGS_FILE)?);

@@ -18,7 +18,7 @@ pub mod vibration;
 mod socket;
 
 const SOCKET_PATH: &str = "/deviceinfo/dac.sock";
-const UPDATE_STATE_INT: Duration = Duration::from_secs(10);
+const UPDATE_STATE_INT: Duration = Duration::from_secs(1200);
 
 pub type FrankStateLock = Arc<RwLock<FrankState>>;
 
@@ -42,7 +42,7 @@ pub async fn run() -> Result<(mpsc::Sender<FrankCommand>, FrankStateLock), Frank
         }
     };
 
-    info!("[Frank] Ready! Spawning thread");
+    info!("[Frank] Frank is ready to play!");
     tokio::spawn(task(listener, stream, cmd_rx, state_lock.clone()));
 
     Ok((cmd_tx, state_lock))
@@ -54,7 +54,9 @@ async fn task(
     mut cmd_rx: mpsc::Receiver<FrankCommand>,
     state_lock: FrankStateLock,
 ) {
+    info!("[Frank] Lets crank some frank!");
     let mut interval = interval(UPDATE_STATE_INT);
+
     loop {
         tokio::select! {
             new_stream = accept_new_frank(&mut listener) => {

@@ -7,6 +7,5 @@ WantedBy=multi-user.target
 [Service]
 ExecStart=/opt/opensleep/opensleep
 WorkingDirectory=/opt/opensleep
-Environment="RUST_BACKTRACE=1"
 Restart=always
 Type=simple

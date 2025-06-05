@@ -54,7 +54,8 @@ pub enum BySideSettings {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SideSettings {
-    ///offset from "neutral" temperature, °C*10 (IE -40 -> -4°C)
+    /// -10 -> 25.8°C
+    /// -50 -> 21
     pub temp_profile: Vec<i16>,
     pub sleep: Time,
     pub wake: Time,

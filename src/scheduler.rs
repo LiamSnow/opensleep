@@ -3,10 +3,13 @@ use std::time::Duration;
 use jiff::{civil::Time, tz::TimeZone, SignedDuration, Timestamp, ToSpan, Unit, Zoned};
 use log::{error, info};
 use thiserror::Error;
-use tokio::{sync::{
-    mpsc,
-    watch::{Receiver, Ref},
-}, time::interval};
+use tokio::{
+    sync::{
+        mpsc,
+        watch::{error::RecvError, Receiver, Ref},
+    },
+    time::sleep,
+};
 
 use crate::{
     frank::{
@@ -20,63 +23,81 @@ use crate::{
 pub enum SchedulerError {
     #[error("jiff error: `{0}`")]
     Jiff(#[from] jiff::Error),
+    #[error("watch channel revc error: `{0}`")]
+    Watch(#[from] RecvError),
 }
 
 /// This function tries to never crash, unless there is Jiff error, in which case we want to crash
 /// (either its a core issue that needs to be fixed or a configuration issue)
-pub async fn run(frank_tx: mpsc::Sender<FrankCommand>, mut cfg_rx: Receiver<Settings>) -> Result<(), SchedulerError> {
+pub async fn run(
+    frank_tx: mpsc::Sender<FrankCommand>,
+    mut cfg_rx: Receiver<Settings>,
+) -> Result<(), SchedulerError> {
     loop {
-        let cfg = cfg_rx.borrow_and_update();
+        let handle = {
+            let cfg = cfg_rx.borrow_and_update();
 
-        if let Some(bri) = cfg.led_brightness {
-            let res = frank_tx.send(FrankCommand::SetSettings(Box::new(FrankSettings {
-                version: 1,
-                gain_right: 400,
-                gain_left: 400,
-                led_brightness_perc: bri,
-            }))).await;
-            if let Err(e) = res {
-                error!("[Scheduler] Frank channel error {e}");
-            }
-        }
-
-        if !cfg.away_mode {
-            let tz = &cfg.timezone.clone();
-            let mut schedule = make_schedule(cfg)?;
-            schedule.sort_by_key(|(z, _)| z.clone());
-
-            for (mut next, cmd) in schedule {
-                loop {
-                    let now = Timestamp::now().to_zoned(tz.clone());
-                    if next > now {
-                        let dur = Duration::from_secs(now.until(&next)?.total(Unit::Second)? as u64);
-                        tokio::select! {
-                            _ = tokio::time::sleep(dur) => {
-                                let res = frank_tx.send(cmd.clone()).await;
-                                if let Err(e) = res {
-                                    error!("[Scheduler] Frank channel error {e}");
-                                }
-                                next = next.checked_add(1.day())?;
-                            }
-                            _ = cfg_rx.changed() => {
-                                break;
-                            }
-                        }
-                    } else {
-                        next = next.checked_add(1.day())?;
-                    }
+            // set settings
+            if let Some(bri) = cfg.led_brightness {
+                let res = frank_tx
+                    .send(FrankCommand::SetSettings(Box::new(FrankSettings {
+                        version: 1,
+                        gain_right: 400,
+                        gain_left: 400,
+                        led_brightness_perc: bri,
+                    })))
+                    .await;
+                if let Err(e) = res {
+                    error!("[Scheduler] Frank channel error {e}");
                 }
             }
-        } else {
-            // borrow checker being hella annoying
-            // here so this is my fix
-            let mut interval = interval(Duration::from_secs(3));
-            loop {
-                interval.tick().await;
-                if cfg.has_changed() {
-                    break
+
+            // make schedule and run it
+            if !cfg.away_mode {
+                let tz = cfg.timezone.clone();
+                let mut schedule = make_schedule(cfg)?;
+                schedule.sort_by_key(|(z, _)| z.clone());
+
+                info!(
+                    "[Scheduler] New schedule has {} events: {:#?}",
+                    schedule.len(),
+                    schedule
+                );
+
+                Some(tokio::spawn(task(frank_tx.clone(), schedule, tz)).abort_handle())
+            } else {
+                None
+            }
+        };
+
+        // wait until next change
+        cfg_rx.changed().await?;
+        handle.map(|h| h.abort());
+        info!("[Scheduler] Settings have changed! Restarting...");
+    }
+}
+
+/// run schedule daily
+pub async fn task(
+    frank_tx: mpsc::Sender<FrankCommand>,
+    mut schedule: Vec<(Zoned, FrankCommand)>,
+    tz: TimeZone,
+) -> Result<(), SchedulerError> {
+    loop {
+        for (next, cmd) in &mut schedule {
+            let now = Timestamp::now().to_zoned(tz.clone());
+            if *next > now {
+                let dur = Duration::from_secs(now.until(&*next)?.total(Unit::Second)? as u64);
+                info!("[Scheduler] Waiting {dur:#?}");
+
+                sleep(dur).await;
+                let res = frank_tx.send(cmd.clone()).await;
+                if let Err(e) = res {
+                    error!("[Scheduler] Frank channel error {e}");
                 }
             }
+
+            *next = next.checked_add(1.day())?;
         }
     }
 }
@@ -120,8 +141,10 @@ fn schedule_side(
 
     if let Some(vib) = &cfg.vibration {
         let vib_dt = wake_dt.checked_sub(SignedDuration::from_secs(vib.offset.into()))?;
-        let set = Box::new((vib.clone(), vib_dt.time(), tz.clone()));
-        res.push((vib_dt, FrankCommand::SetAlarm(tar.clone(), set)));
+        let vib_settings = Box::new((vib.clone(), vib_dt.time(), tz.clone()));
+        // let Frank know about the alarm ahead of time
+        let set_vib_dt = vib_dt.checked_sub(SignedDuration::from_mins(7))?;
+        res.push((set_vib_dt, FrankCommand::SetAlarm(tar.clone(), vib_settings)));
     }
 
     if let Some(heat) = &cfg.heat {
