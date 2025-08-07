@@ -116,7 +116,7 @@ pub async fn request_new_state(stream: &mut UnixStream) -> Option<FrankState> {
 
     // FrankState is usually 230-245 bytes, biggest line
     // is setting ~57 bytes
-    let res = match read_response(stream, 260, 60).await {
+    let resp = match read_response(stream, 260, 60).await {
         Ok(s) => s,
         Err(e) => {
             error!("[Frank] Get status update command failed: {e}");
@@ -124,7 +124,7 @@ pub async fn request_new_state(stream: &mut UnixStream) -> Option<FrankState> {
         }
     };
 
-    let new_state = match FrankState::parse(res) {
+    let new_state = match FrankState::parse(resp) {
         Ok(state) => state,
         Err(e) => {
             error!("[Frank] FrankState failed to parse: {e}");

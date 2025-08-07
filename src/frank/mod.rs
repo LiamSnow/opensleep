@@ -18,7 +18,7 @@ pub mod vibration;
 mod socket;
 
 const SOCKET_PATH: &str = "/deviceinfo/dac.sock";
-const UPDATE_STATE_INT: Duration = Duration::from_secs(1200);
+const UPDATE_STATE_INT: Duration = Duration::from_secs(30);
 
 pub type FrankStateLock = Arc<RwLock<FrankState>>;
 

@@ -11,11 +11,13 @@ pub struct TimestampedVibrationAlarm {
     pub intensity_percent: u8,
     #[serde(rename = "du")]
     pub duration_sec: u16,
-    /// "double" or "rise"
     #[serde(rename = "pi")]
     pub pattern: String,
     #[serde(rename = "tt")]
     pub timestamp: u64,
+    // 0?
+    // #[serde(rename = "di")]
+    // pub unknown: u16,
 }
 
 impl VibrationAlarm {

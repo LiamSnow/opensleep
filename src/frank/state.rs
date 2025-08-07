@@ -16,8 +16,8 @@ pub struct FrankState {
     /// How long the target temperture will last
     /// for in seconds for each side of the bed
     pub tar_temp_time: BedTempTime,
-    /// "20600-0001-F00-0001089C" when running
-    /// "ul" when not running
+    /// "20600-0001-F00-0001089C"
+    /// Before setting first temp: "ul"
     pub sensor_label: String,
     pub water_level: bool,
     /// Whether the bed is priming or not

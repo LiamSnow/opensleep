@@ -86,15 +86,15 @@ pub async fn task(
     loop {
         for (next, cmd) in &mut schedule {
             let now = Timestamp::now().to_zoned(tz.clone());
-            if *next > now {
+            if now < *next {
                 let dur = Duration::from_secs(now.until(&*next)?.total(Unit::Second)? as u64);
                 info!("[Scheduler] Waiting {dur:#?}");
-
                 sleep(dur).await;
-                let res = frank_tx.send(cmd.clone()).await;
-                if let Err(e) = res {
-                    error!("[Scheduler] Frank channel error {e}");
-                }
+            }
+
+            let res = frank_tx.send(cmd.clone()).await;
+            if let Err(e) = res {
+                error!("[Scheduler] Frank channel error {e}");
             }
 
             *next = next.checked_add(1.day())?;
@@ -143,7 +143,7 @@ fn schedule_side(
         let vib_dt = wake_dt.checked_sub(SignedDuration::from_secs(vib.offset.into()))?;
         let vib_settings = Box::new((vib.clone(), vib_dt.time(), tz.clone()));
         // let Frank know about the alarm ahead of time
-        let set_vib_dt = vib_dt.checked_sub(SignedDuration::from_mins(7))?;
+        let set_vib_dt = vib_dt.checked_sub(SignedDuration::from_mins(3))?;
         res.push((set_vib_dt, FrankCommand::SetAlarm(tar.clone(), vib_settings)));
     }
 
@@ -203,6 +203,8 @@ fn calc_sleep_wake_dts(
     Ok((sleep, wake))
 }
 
+// TODO ideally this will change the temperature
+// every ~1 min for a gradual tempature change
 fn calc_profile(
     res: &mut Vec<(Zoned, FrankCommand)>,
     tar: SideTarget,

@@ -1,10 +1,67 @@
 # Open Sleep
 
-Control the Eight Sleep Pod 3 locally and automatically!
+FOSS firmware for Eight Sleep Pod 3.
+Completely replaces all Eight Sleep services (Frank, DAC/PizzaRat, Capybara).
+As this replaces the DAC, you cannot use the mobile app to control the
+bed once setup.
 
-Open Sleep communicates with the bed's firmware (`frakenfirmware`) by pretending
-to be the DAC. This means that, once setup, you **CANNOT** use the Eight Sleep
-mobile app to control the bed.
+TODO
+ - [ ] OpenSensor
+     - [x] Connect
+     - [x] Parse messages
+     - [x] Set gain, sampling rate, enable vibration, start sampling
+     - [ ] Read bed temp sensors
+     - [ ] Read capacitance sensors
+     - [ ] Read piezo sensors
+     - [ ] Set alarms
+ - [ ] OpenFrozen
+     - [x] Connect
+     - [x] Parse messages
+     - [x] Set l/r temps
+     - [x] Prime
+     - [ ] Turn off
+     - [ ] Parse unknown values
+
+
+## Eight Sleep Background
+
+Linux SOM (`VAR-SOM-MX8M-MINI_V1.x`) running pretty minimal Yocto build.
+ - Systems runs off 8GB eMMC normally
+ - Micro SD card (16GB industrial SanDisk) contains 3 partitions (p1 to boot from, p3 for persistent storage)
+    - If the small button is held in during boot, the SOM will boot from the SD card p1
+    - It will run a script that will copy `/opt/images/Yocto/rootfs.tar.gz` onto the eMMC, then reboots from eMMC
+
+### Services
+Frank (`/opt/eight/bin/frakenfirmware`) C++ binary with simple UNIX socket commands. Controls:
+ - LEDs over I2C (IS31FL3194)
+    - Also controlled by other processes
+ - Sensor Unit (STM32F030CCT6) over UART (`/dev/ttymxc0`), flashes `firmware-sensor.bbin`
+    - 6 capacitance sensors, 1x/second
+    - 2 Piezo sensors, 500x/second
+    - Bed temp (microcontroller's temp, ambient temp, humidity, 6 on bed)
+    - Freezer temp (ambient, hs, left/right)
+    - Vibration alarms
+    - Takes in a left and right ADC gain parameter (default `400`)
+ - "Frozen" over UART (`/dev/ttymxc2`), flashes `firmware-frozen.bbin`
+    - Takes l/r temperatures and durations
+ - TODO water level? solenoid? ...?
+ - Uploading Raw sensor data + logs to `raw-api-upload.8slp.net:1337`
+
+Capybara (`/opt/eight/bin/Eight.Capybara`) .NET code. Didn't look into this much but it seems to handle initial setup via bluetooth
+ - Writes `/deviceinfo`
+ - Has a loopback with the sensor UART (for debugging?)
+ - Restarts Frozen (seemingly a critical function??)
+
+Device-API-Client (DAC)/PizzaRat (`/home/dac/app`) Node TypeScript code
+ - CoAP for device API `device-api.8slp.net:5684`
+ - Basically just a wrapper for Frank
+
+SWUpdate gets software updates from `update-api.8slp.net:443`
+
+### Hardware
+
+
+
 
 ## Features
 
@@ -22,11 +79,40 @@ button on the back, which performs a factory reset from `rootfs.tar.gz`. Now you
 Eight Sleep's update service and [Add Open Sleep](#adding-open-sleep-).
 
 - **Note**: the default SSH port for Pod 3 is `8822`.
-- **Disable Updates**: `systemctl disable --now swupdate-progress swupdate defibrillator eight-kernel telegraf vector`
+- **Disable Updates**: `systemctl disable --now swupdate-progress swupdate defibrillator`
 
 Eventually I will add thorough tutorial for this, but for now I would recommend
 [Bo Lopker's Tutorial](https://blopker.com/writing/04-zerosleep-1/#disassembly-overview)
 and the [ninesleep instructions](https://github.com/bobobo1618/ninesleep?tab=readme-ov-file#instructions).
+
+### Making your Settings
+
+Make a new `settings.json` file. See the examples `example_couples.json` and `example_solo.json`.
+
+```json
+{
+  "timezone": "America/New_York", // IANA timezone
+  "away_mode": false, // disables everything temporarily
+  "prime": "15:00", // daily time to prime the bed
+  "led_brightness": 0, // 0-100% brightness
+  // either "both" (Solo mode) or "left" and "right" (Couples mode)
+  "both": {
+    "temp_profile": [-10, 10, 20], // spread from "sleep" to "wake"
+    "sleep": "22:00", // must be 24-hour time
+    "wake": "07:30",
+    "vibration": {
+      "pattern": "double",
+      "intensity": 50, // 0-100%
+      "duration": 600, // seconds
+      "offset": 300 // seconds before "wake"
+    },
+    "heat": {
+      "temp": 100,
+      "offset": 1800 // lasts from wake-offset until wake
+    }
+  }
+}
+```
 
 ### Adding Open Sleep
 
@@ -36,13 +122,13 @@ Build with:
 cargo build --target aarch64-unknown-linux-musl --release
 ```
 
-1.  Create a `settings.json` (see examples `example_couples.json` and `example_solo.json`)
-2.  `scp` the binary, `opensleep.service`, and `settings.json` to the Pod
-3.  `ssh` in, sign in as root
-4.  Move the binary and JSON to `/opt/opensleep`
-5.  Move the service file to `/etc/systemd/system`
-6.  Stop the DAC `systemctl disable --now dac`
-7.  Enable the Open Sleep `systemctl enable --now opensleep`
+1.  (Recommended) block all internet access (except NTP) on your router
+2.  Stop services `systemctl disable --now dac frank`
+    - (Optional) Stop other services `swupdate-progress swupdate defibrillator eight-kernel telegraf vector`
+3.  Place the binary `opensleep` and `settings.json` at `/opt/opensleep`
+4.  Place the services `opensleep.service` and `frank.service` at `/lib/systemd/system`
+5.  `echo "127.0.0.1 raw-api-upload.8slp.net" | sudo tee -a /etc/hosts` (to intercept raw upload data)
+6.  Enable Open Sleep and Frank `systemctl enable --now opensleep frank`
 
 ## API
 

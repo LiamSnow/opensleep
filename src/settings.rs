@@ -79,10 +79,12 @@ pub struct VibrationAlarm {
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum VibrationPattern {
-    ///heavy
+    ///heavy?
     Double,
-    ///gentle
+    ///gentle? (not working on my Pod 3 for some reason)
     Rise,
+    /// ?
+    Single,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
@@ -145,6 +147,7 @@ impl VibrationPattern {
         match self {
             VibrationPattern::Double => "double",
             VibrationPattern::Rise => "rise",
+            VibrationPattern::Single => "single",
         }
         .to_string()
     }
@@ -157,6 +160,7 @@ impl FromStr for VibrationPattern {
         match s {
             "double" => Ok(Self::Double),
             "rise" => Ok(Self::Rise),
+            "single" => Ok(Self::Single),
             _ => Err(SettingsError::InvalidVibrationPattern(s.to_string())),
         }
     }

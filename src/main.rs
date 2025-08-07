@@ -4,13 +4,14 @@ use scheduler::SchedulerError;
 use settings::{Settings, SettingsError};
 use simplelog::{ColorChoice, CombinedLogger, TermLogger, TerminalMode, WriteLogger};
 use thiserror::Error;
-use std::{fs::File, io};
+use std::{fs::File, io, thread};
 use tokio::sync::watch;
 
 mod frank;
 mod scheduler;
 mod settings;
 mod api;
+mod stream;
 
 #[cfg(test)]
 mod test;
@@ -55,6 +56,9 @@ async fn main() -> Result<(), MainError> {
 
     info!("[Main] Reading settings file: {SETTINGS_FILE}");
     let (settings_tx, settings_rx) = watch::channel(Settings::from_file(SETTINGS_FILE)?);
+
+    info!("[Main] Starting Sleep Tracking Streamer");
+    //thread::spawn(|| stream::run_blocking());
 
     info!("[Main] Finding a Frank");
     let (frank_tx, frank_state) = frank::run().await?;

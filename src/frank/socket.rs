@@ -8,9 +8,7 @@ use tokio::{
 
 use super::error::FrankError;
 
-/// sometimes Frank gets stuck, but sending more commands
-/// to him will make him seg fault so its better to wait
-const RESPONSE_TIMEOUT: Duration = Duration::from_secs(360);
+const RESPONSE_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// write a command, read "ok"
 pub async fn cmd_transaction(stream: &mut UnixStream, cmd: u8) -> Result<(), FrankError> {
