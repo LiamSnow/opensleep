@@ -1,0 +1,542 @@
+
+---
+
+REMOVING TANK WHILE RUNNING TEST
+
+
+[2025-08-12T17:43:22Z DEBUG opensleep::sensor::state] Message: FW: [cap_sense] 1.2176 1.5339 1.6644 1.8518 1.9664 2.0731
+[2025-08-12T17:43:24Z DEBUG opensleep::frozen::state] Temperature update - Left: 2268, Right: 2250, Heatsink: 2212, Power: 8
+[2025-08-12T17:43:24Z DEBUG opensleep::frozen::state] Message: FW: pump[left] off @ 0.000000V 0.000000A
+[2025-08-12T17:43:24Z DEBUG opensleep::frozen::state] Message: FW: pump[right] off @ 0.000000V 0.000000A
+[2025-08-12T17:43:26Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T17:43:31Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T17:43:32Z DEBUG opensleep::sensor::state] Message: FW: [cap_sense] 1.1599 1.4806 1.6429 1.9060 1.9301 2.1168
+[2025-08-12T17:43:34Z DEBUG opensleep::frozen::state] Temperature update - Left: 2268, Right: 2250, Heatsink: 2212, Power: 8
+[2025-08-12T17:43:34Z DEBUG opensleep::frozen::state] Message: FW: pump[left] off @ 0.000000V 0.000000A
+[2025-08-12T17:43:34Z DEBUG opensleep::frozen::state] Message: FW: pump[right] off @ 0.000000V 0.000000A
+[2025-08-12T17:43:34Z DEBUG opensleep::frozen::state] Message: FW: [float_valve] solenoid_current @ 0.000000A
+[2025-08-12T17:43:34Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] solenoid_current @ 0.000312A
+[2025-08-12T17:43:36Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T17:43:38Z DEBUG opensleep::frozen::state] Message: FW: water empty -> full
+[2025-08-12T17:43:41Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T17:43:42Z DEBUG opensleep::sensor::state] Message: FW: [cap_sense] 1.2226 1.5601 1.5886 1.8767 1.9436 1.9608
+[2025-08-12T17:43:44Z DEBUG opensleep::frozen::state] Temperature update - Left: 2268, Right: 2250, Heatsink: 2212, Power: 8
+[2025-08-12T17:43:44Z DEBUG opensleep::frozen::state] Message: FW: pump[left] off @ 0.000000V 0.000000A
+[2025-08-12T17:43:44Z DEBUG opensleep::frozen::state] Message: FW: pump[right] off @ 0.000000V 0.000000A
+
+
+[2025-08-12T17:44:11Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] on - open with timeout 5000
+[2025-08-12T17:44:12Z DEBUG opensleep::frozen::state] Target update - Side: Right, Enabled: true, Temp: 2847
+[2025-08-12T17:44:12Z DEBUG opensleep::frozen::state] Message: FW: pid[right] 22.500000 3.014850 1.791000 0.029850 1.194000
+[2025-08-12T17:44:12Z DEBUG opensleep::frozen::state] Message: FW: command set_side left enabled (2847)
+[2025-08-12T17:44:12Z DEBUG opensleep::sensor::state] Message: FW: [ambient] temp 23.5924 humidity 34.6112 percent
+[2025-08-12T17:44:12Z DEBUG opensleep::sensor::state] Message: FW: [ambient] crc mismatches: 0
+[2025-08-12T17:44:12Z DEBUG opensleep::sensor::state] Message: FW: [cap_sense] 1.1869 1.4417 1.6663 1.9407 1.9825 2.1214
+[2025-08-12T17:44:12Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] on - open with timeout 5000
+[2025-08-12T17:44:12Z DEBUG opensleep::frozen::state] Target update - Side: Left, Enabled: true, Temp: 2847
+[2025-08-12T17:44:12Z DEBUG opensleep::frozen::state] Message: FW: pid[left] 22.687500 7.546162 1.734750 0.028912 5.782499
+[2025-08-12T17:44:13Z DEBUG opensleep::frozen::state] Message: FW: water full -> empty
+[2025-08-12T17:44:14Z DEBUG opensleep::frozen::state] Temperature update - Left: 2268, Right: 2250, Heatsink: 2212, Power: 8
+[2025-08-12T17:44:14Z DEBUG opensleep::frozen::state] Message: FW: pid[heatsink] 0.312500 0.968750 0.968750 0.000000 0.000000
+[2025-08-12T17:44:14Z DEBUG opensleep::frozen::state] Message: FW: pump[left] off @ 0.998388V 0.037697A
+[2025-08-12T17:44:14Z DEBUG opensleep::frozen::state] Message: FW: pump[right] off @ 0.982325V 0.036788A
+[2025-08-12T17:44:14Z DEBUG opensleep::frozen::state] Message: FW: [float_valve] solenoid_current @ 0.000000A
+[2025-08-12T17:44:14Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] solenoid_current @ 0.151357A
+[2025-08-12T17:44:14Z DEBUG opensleep::frozen::state] Message: FW: [stats] avg:7ms max:243ms min:0ms
+
+[2025-08-12T17:44:16Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T17:44:17Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] off - closed
+[2025-08-12T17:44:21Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T17:44:22Z DEBUG opensleep::sensor::state] Message: FW: [cap_sense] 1.2303 1.5002 1.6254 1.8009 1.9214 2.0200
+[2025-08-12T17:44:23Z DEBUG opensleep::frozen::state] Temperature update - Left: 2268, Right: 2243, Heatsink: 2212, Power: 8
+[2025-08-12T17:44:24Z DEBUG opensleep::frozen::state] Message: FW: pump[right] off @ 0.006660V 0.000000A
+[2025-08-12T17:44:26Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T17:44:31Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T17:44:32Z DEBUG opensleep::sensor::state] Message: FW: [cap_sense] 1.1963 1.5002 1.6412 1.7870 2.1455 2.1873
+[2025-08-12T17:44:33Z DEBUG opensleep::frozen::state] Temperature update - Left: 2268, Right: 2243, Heatsink: 2212, Power: 8
+[2025-08-12T17:44:33Z DEBUG opensleep::frozen::state] Message: FW: pump[left] off @ 0.013312V 0.000000A
+[2025-08-12T17:44:33Z DEBUG opensleep::frozen::state] Message: FW: pump[right] off @ 0.000000V 0.000000A
+[2025-08-12T17:44:34Z DEBUG opensleep::frozen::state] Message: FW: [float_valve] solenoid_current @ 0.000030A
+[2025-08-12T17:44:34Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] solenoid_current @ 0.000317A
+[2025-08-12T17:44:36Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T17:44:37Z DEBUG opensleep::frozen::state] Message: FW: water empty -> full
+[2025-08-12T17:44:41Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T17:44:42Z DEBUG opensleep::sensor::state] Message: FW: [cap_sense] 1.1835 1.5534 1.5813 1.8529 2.0984 2.0983
+[2025-08-12T17:44:43Z DEBUG opensleep::frozen::state] Temperature update - Left: 2262, Right: 2243, Heatsink: 2212, Power: 8
+[2025-08-12T17:44:43Z DEBUG opensleep::frozen::state] Message: FW: pump[left] off @ 0.009990V 0.000000A
+[2025-08-12T17:44:43Z DEBUG opensleep::frozen::state] Message: FW: pump[right] off @ 0.000000V 0.000000A
+[2025-08-12T17:44:46Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T17:44:51Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T17:44:52Z DEBUG opensleep::sensor::state] Message: FW: [cap_sense] 1.1757 1.5034 1.7006 1.8042 1.9481 2.1819
+[2025-08-12T17:44:53Z DEBUG opensleep::frozen::state] Temperature update - Left: 2262, Right: 2243, Heatsink: 2212, Power: 8
+[2025-08-12T17:44:53Z DEBUG opensleep::frozen::state] Message: FW: pump[left] off @ 0.009984V 0.000000A
+[2025-08-12T17:44:53Z DEBUG opensleep::frozen::state] Message: FW: pump[right] off @ 0.000000V 0.000000A
+[2025-08-12T17:44:54Z DEBUG opensleep::frozen::state] Message: FW: [float_valve] solenoid_current @ 0.000000A
+[2025-08-12T17:44:54Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] solenoid_current @ 0.000317A
+
+---
+
+TANK IN
+
+root@imx8mm-var-dart-eight:~# i2cdump -y 1 0x20
+No size specified (using byte-data access)
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f    0123456789abcdef
+00: 19 0e fd 3f 00 00 fc 31 XX XX XX XX XX XX XX XX    ????..?1XXXXXXXX
+10: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+20: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+30: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+40: ff ff ff ff 00 00 00 00 ff ff ff ff 00 00 XX 00    ..............X.
+50: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+60: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+70: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+80: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+90: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+a0: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+b0: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+c0: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+d0: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+e0: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+f0: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+root@imx8mm-var-dart-eight:~# i2cdump -y 1 0x56
+No size specified (using byte-data access)
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f    0123456789abcdef
+00: 88 20 20 39 66 6c 35 46 75 47 64 6a 0a 69 20 39    ?  9fl5FuGdj?i 9
+10: 3a 61 2d 77 52 44 20 20 4b 73 32 46 61 2f ff ff    :a-wRD  Ks2Fa/..
+20: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+30: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+40: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+50: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+60: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+70: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+80: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+90: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+a0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+b0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+c0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+d0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+e0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+f0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+root@imx8mm-var-dart-eight:~# i2cdump -y 1 0x57
+No size specified (using byte-data access)
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f    0123456789abcdef
+00: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+10: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+20: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+30: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+40: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+50: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+60: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+70: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+80: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+90: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+a0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+b0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+c0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+d0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+e0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+f0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+
+TANK OUT
+
+root@imx8mm-var-dart-eight:~# i2cdump -y 1 0x20
+No size specified (using byte-data access)
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f    0123456789abcdef
+00: 19 0e fd 3f 00 00 fc 31 XX XX XX XX XX XX XX XX    ????..?1XXXXXXXX
+10: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+20: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+30: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+40: ff ff ff ff 00 00 00 00 ff ff ff ff 00 00 XX 00    ..............X.
+50: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+60: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+70: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+80: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+90: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+a0: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+b0: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+c0: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+d0: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+e0: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+f0: XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX XX    XXXXXXXXXXXXXXXX
+root@imx8mm-var-dart-eight:~# i2cdump -y 1 0x56
+No size specified (using byte-data access)
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f    0123456789abcdef
+00: 88 20 20 39 66 6c 35 46 75 47 64 6a 0a 69 20 39    ?  9fl5FuGdj?i 9
+10: 3a 61 2d 77 52 44 20 20 4b 73 32 46 61 2f ff ff    :a-wRD  Ks2Fa/..
+20: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+30: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+40: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+50: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+60: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+70: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+80: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+90: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+a0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+b0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+c0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+d0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+e0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+f0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+root@imx8mm-var-dart-eight:~# i2cdump -y 1 0x57
+No size specified (using byte-data access)
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f    0123456789abcdef
+00: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+10: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+20: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+30: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+40: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+50: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+60: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+70: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+80: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+90: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+a0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+b0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+c0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+d0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+e0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+f0: ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff    ................
+
+---
+
+PRIME ON BOOT NO WATER TANK
+
+[2025-08-12T17:51:07Z DEBUG opensleep::sensor::state] Jumping to firmware with code: 0x00
+[2025-08-12T17:51:07Z INFO  opensleep::sensor::state] Device mode: Bootloader -> Firmware
+[2025-08-12T17:51:07Z DEBUG mio_serial] opening serial port in synchronous blocking mode
+[2025-08-12T17:51:07Z DEBUG mio_serial] setting O_NONBLOCK for /dev/ttymxc0
+[2025-08-12T17:51:07Z INFO  opensleep::sensor::manager] Connected
+[2025-08-12T17:51:07Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T17:51:07Z DEBUG opensleep::sensor::state] Message: FW: Calibration: 69, time 0
+[2025-08-12T17:51:07Z DEBUG opensleep::sensor::state] Message: FW: [ambient] initialization succeeded
+[2025-08-12T17:51:07Z DEBUG opensleep::sensor::state] Message: FW: Heater current offset 2447
+[2025-08-12T17:51:07Z DEBUG opensleep::sensor::state] Message: FW: Power set to off
+[2025-08-12T17:51:07Z WARN  opensleep::sensor::state] Init: 7467
+[2025-08-12T17:51:07Z DEBUG opensleep::sensor::state] Message: FW: [sensor] pod 2.0 features init
+[2025-08-12T17:51:07Z DEBUG opensleep::sensor::state] Message: FW: [motors] init
+[2025-08-12T17:51:07Z DEBUG opensleep::sensor::state] Message: FW: [alarm] init
+[2025-08-12T17:51:07Z DEBUG opensleep::sensor::state] Message: FW: alarm[left] off
+[2025-08-12T17:51:07Z DEBUG opensleep::sensor::state] Message: FW: alarm[right] off
+[2025-08-12T17:51:07Z DEBUG opensleep::sensor::state] Message: FW: HWINFO sn 0001089c pn 20600 sku 1 hw 0500 f 1 d 16010d
+[2025-08-12T17:51:07Z DEBUG opensleep::sensor::state] Message: FW: [sys] using hse: yes
+[2025-08-12T17:51:07Z DEBUG opensleep::sensor::state] Message: FW: [ambient] temp 23.4530 humidity 35.0537 percent
+[2025-08-12T17:51:07Z DEBUG opensleep::sensor::state] Message: FW: [ambient] crc mismatches: 0
+[2025-08-12T17:51:07Z DEBUG opensleep::sensor::state] Message: FW: [cap_sense] 0.0000 0.0000 0.0000 0.0000 0.0000 0.0000
+[2025-08-12T17:51:07Z DEBUG opensleep::sensor::state] Message: FW: HWINFO sn 0001089c pn 20600 sku 1 hw 0500 f 1 d 16010d
+[2025-08-12T17:51:08Z INFO  opensleep::sensor::state] Vibration Enabled
+[2025-08-12T17:51:08Z INFO  opensleep::frozen::state] Hardware info: SN 000157e2 PN 20500 SKU 2 HWREV 0502 FACTORYFLAG 1 DATECODE 16070c
+[2025-08-12T17:51:08Z INFO  opensleep::sensor::state] Hardware info: SN 0001089c PN 20600 SKU 1 HWREV 0500 FACTORYFLAG 1 DATECODE 16010d
+[2025-08-12T17:51:08Z INFO  opensleep::sensor::state] Piezo Gain Set: 405,405
+[2025-08-12T17:51:08Z DEBUG opensleep::frozen::state] Jumping to firmware with code: 0x02
+[2025-08-12T17:51:08Z INFO  opensleep::sensor::state] Piezo Enabled A1,00
+[2025-08-12T17:51:08Z DEBUG opensleep::frozen::manager] TX: SetTemperature { side: Right, temp: 28.704302, enabled: true }
+[2025-08-12T17:51:08Z DEBUG opensleep::frozen::manager] TX: SetTemperature { side: Left, temp: 28.704302, enabled: true }
+[2025-08-12T17:51:08Z DEBUG opensleep::frozen::manager] TX: SetTemperature { side: Left, temp: 28.704302, enabled: true }
+[2025-08-12T17:51:08Z DEBUG opensleep::frozen::manager] TX: SetTemperature { side: Right, temp: 28.704302, enabled: true }
+[2025-08-12T17:51:08Z DEBUG opensleep::frozen::state] Message: FW: [priming] start
+[2025-08-12T17:51:08Z DEBUG opensleep::frozen::state] Message: FW: [priming] empty phase (4 remaining; runtime 600000 ms)
+[2025-08-12T17:51:08Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] duty cycle - open 45000 ms / close 15000 ms
+[2025-08-12T17:51:08Z ERROR opensleep::common::codec] Frozen got unexpected packet: b"\xd2\0"
+[2025-08-12T17:51:08Z DEBUG opensleep::frozen::state] Message: FW: [priming] done because empty
+[2025-08-12T17:51:08Z DEBUG opensleep::frozen::state] Message: FW: [priming] done
+[2025-08-12T17:51:08Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] off - closed
+[2025-08-12T17:51:08Z DEBUG opensleep::frozen::state] Message: FW: command set_side right enabled (2870)
+[2025-08-12T17:51:08Z DEBUG opensleep::frozen::state] Target update - Side: Right, Enabled: true, Temp: 2870
+[2025-08-12T17:51:08Z DEBUG opensleep::frozen::state] Message: FW: command set_side left enabled (2870)
+[2025-08-12T17:51:08Z DEBUG opensleep::frozen::state] Target update - Side: Left, Enabled: true, Temp: 2870
+[2025-08-12T17:51:08Z DEBUG opensleep::frozen::state] Message: FW: command set_side left enabled (2870)
+[2025-08-12T17:51:08Z DEBUG opensleep::frozen::state] Target update - Side: Left, Enabled: true, Temp: 2870
+[2025-08-12T17:51:09Z DEBUG opensleep::sensor::state] Message: FW: Sampling rate set (1000Hz)
+[2025-08-12T17:51:09Z INFO  opensleep::sensor::state] Piezo Enabled A8,00
+[2025-08-12T17:51:09Z INFO  opensleep::sensor::manager] Piezo sampling at 1000Hz
+[2025-08-12T17:51:12Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T17:51:13Z DEBUG opensleep::frozen::state] Temperature update - Left: 2256, Right: 2237, Heatsink: 2212, Power: 8
+[2025-08-12T17:51:13Z DEBUG opensleep::frozen::state] Message: FW: pid[heatsink] 0.312500 0.968750 0.968750 0.000000 0.000000
+[2025-08-12T17:51:13Z DEBUG opensleep::frozen::state] Message: FW: pump[left] off @ 0.069887V 0.000000A
+[2025-08-12T17:51:13Z DEBUG opensleep::frozen::state] Message: FW: pump[right] off @ 0.056575V 0.000000A
+[2025-08-12T17:51:13Z DEBUG opensleep::frozen::state] Message: FW: [float_valve] solenoid_current @ 0.000015A
+[2025-08-12T17:51:13Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] solenoid_current @ 0.000317A
+[2025-08-12T17:51:13Z DEBUG opensleep::frozen::state] Message: FW: [stats] avg:7ms max:242ms min:0ms
+[2025-08-12T17:51:17Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T17:51:17Z DEBUG opensleep::sensor::state] Message: FW: [cap_sense] 1.1803 1.4703 1.7470 1.9182 1.9453 2.1143
+[2025-08-12T17:51:22Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T17:51:23Z DEBUG opensleep::frozen::state] Temperature update - Left: 2256, Right: 2237, Heatsink: 2212, Power: 8
+[2025-08-12T17:51:23Z DEBUG opensleep::frozen::state] Message: FW: pump[left] off @ 0.009990V 0.000000A
+[2025-08-12T17:51:23Z DEBUG opensleep::frozen::state] Message: FW: pump[right] off @ 0.000000V 0.000000A
+
+--
+
+PRIME WITH LOW TANK
+
+[2025-08-12T17:53:36Z DEBUG opensleep::frozen::state] Message: FW: [priming] start
+[2025-08-12T17:53:36Z DEBUG opensleep::frozen::state] Message: FW: [priming] empty phase (4 remaining; runtime 600000 ms)
+[2025-08-12T17:53:36Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] duty cycle - open 45000 ms / close 15000 ms
+[2025-08-12T17:53:36Z ERROR opensleep::common::codec] Frozen got unexpected packet: b"\xd2\0"
+
+run 2
+
+[2025-08-12T17:54:34Z DEBUG opensleep::frozen::state] Message: FW: [stats] avg:3ms max:115ms min:115ms
+[2025-08-12T17:54:34Z DEBUG opensleep::frozen::state] Message: FW: [priming] start
+[2025-08-12T17:54:34Z DEBUG opensleep::frozen::state] Message: FW: [priming] empty phase (4 remaining; runtime 600000 ms)
+[2025-08-12T17:54:34Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] duty cycle - open 45000 ms / close 15000 ms
+[2025-08-12T17:54:34Z ERROR opensleep::common::codec] Frozen got unexpected packet: b"\xd2\0"
+
+Notes: Seems to just prime anyways
+
+---
+
+REMOVING TANK WHILE PRIMING
+
+[2025-08-12T18:02:11Z DEBUG opensleep::frozen::state] Message: FW: pump[left] fast @ 11.724629V 0.407536A
+[2025-08-12T18:02:11Z DEBUG opensleep::frozen::state] Message: FW: pump[right] fast @ 11.767918V 0.376288A
+[2025-08-12T18:02:11Z DEBUG opensleep::frozen::state] Message: FW: water full -> empty
+[2025-08-12T18:02:12Z DEBUG opensleep::frozen::state] Message: FW: [priming] done because empty
+[2025-08-12T18:02:12Z DEBUG opensleep::frozen::state] Message: FW: [priming] done
+[2025-08-12T18:02:12Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] off - closed
+[2025-08-12T18:02:12Z DEBUG opensleep::frozen::state] Message: FW: tec[left] locked
+[2025-08-12T18:02:12Z DEBUG opensleep::frozen::state] Message: FW: tec[right] locked
+
+----
+
+PRIME WITH EMPTY TANK
+
+[2025-08-12T18:03:39Z DEBUG opensleep::frozen::state] Message: FW: [priming] start
+[2025-08-12T18:03:39Z DEBUG opensleep::frozen::state] Message: FW: [priming] empty phase (4 remaining; runtime 600000 ms)
+[2025-08-12T18:03:39Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] duty cycle - open 45000 ms / close 15000 ms
+[2025-08-12T18:03:39Z ERROR opensleep::common::codec] Frozen got unexpected packet: b"\xd2\0"
+[2025-08-12T18:03:39Z DEBUG opensleep::frozen::state] Message: FW: [priming] done because empty
+[2025-08-12T18:03:39Z DEBUG opensleep::frozen::state] Message: FW: [priming] done
+[2025-08-12T18:03:39Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] off - closed
+
+----
+
+PRIME WITH FULL TANK
+
+
+[2025-08-12T18:07:03Z DEBUG opensleep::frozen::manager] TX: SetTemperature { side: Left, temp: 0.0, enabled: false }
+[2025-08-12T18:07:03Z DEBUG opensleep::frozen::state] Message: FW: [priming] start
+[2025-08-12T18:07:03Z DEBUG opensleep::frozen::state] Message: FW: [priming] empty phase (4 remaining; runtime 600000 ms)
+[2025-08-12T18:07:03Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] duty cycle - open 45000 ms / close 15000 ms
+[2025-08-12T18:07:03Z ERROR opensleep::common::codec] Frozen got unexpected packet: b"\xd2\0"
+...
+
+[2025-08-12T18:17:02Z DEBUG opensleep::frozen::state] Message: FW: [priming] empty stage pause pumps for 30000 ms
+...
+
+[2025-08-12T18:17:37Z DEBUG opensleep::frozen::state] Message: FW: [priming] empty phase (3 remaining; runtime 450000 ms)
+...
+[2025-08-12T18:25:06Z DEBUG opensleep::frozen::state] Message: FW: [priming] empty stage pause pumps for 30000 ms
+...
+[2025-08-12T18:25:41Z DEBUG opensleep::frozen::state] Message: FW: [priming] empty phase (2 remaining; runtime 300000 ms)
+...
+[2025-08-12T18:30:41Z DEBUG opensleep::frozen::state] Message: FW: [priming] empty stage pause pumps for 30000 ms
+...
+[2025-08-12T18:31:16Z DEBUG opensleep::frozen::state] Message: FW: [priming] empty phase (1 remaining; runtime 150000 ms)
+...
+[2025-08-12T18:33:45Z DEBUG opensleep::frozen::state] Message: FW: [priming] empty stage pause pumps for 30000 ms
+...
+[2025-08-12T18:34:18Z DEBUG opensleep::frozen::state] Temperature update - Left: 2343, Right: 2287, Heatsink: 2437, Power: 8
+[2025-08-12T18:34:18Z DEBUG opensleep::frozen::state] Message: FW: pid[heatsink] 1.687500 0.825000 0.831250 0.000000 -0.006250
+[2025-08-12T18:34:18Z DEBUG opensleep::frozen::state] Message: FW: pump[left] off @ 0.036651V 0.000001A
+[2025-08-12T18:34:18Z DEBUG opensleep::frozen::state] Message: FW: pump[right] off @ 0.026655V -0.000001A
+[2025-08-12T18:34:18Z DEBUG opensleep::frozen::state] Message: FW: [float_valve] solenoid_current @ 0.000005A
+[2025-08-12T18:34:18Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] solenoid_current @ 0.000286A
+[2025-08-12T18:34:18Z DEBUG opensleep::frozen::state] Message: FW: [stats] avg:7ms max:244ms min:0ms
+[2025-08-12T18:34:19Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T18:34:20Z DEBUG opensleep::frozen::state] Message: FW: [priming] empty stage finished w/ 0 successful purge
+[2025-08-12T18:34:20Z DEBUG opensleep::frozen::state] Message: FW: [priming] purge phase
+[2025-08-12T18:34:20Z DEBUG opensleep::frozen::state] Message: FW: [priming] purge.fast (120000 ms)
+[2025-08-12T18:34:20Z DEBUG opensleep::sensor::state] Message: FW: [cap_sense] 1.2101 1.5044 1.5819 1.9043 2.0927 2.1784
+[2025-08-12T18:34:20Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] on - open with timeout 45000
+[2025-08-12T18:34:20Z DEBUG opensleep::frozen::state] Message: FW: [priming] purge_fast stage purged? 0
+[2025-08-12T18:34:24Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T18:34:25Z DEBUG opensleep::frozen::state] Message: FW: tec[left] safe, unlocking
+[2025-08-12T18:34:25Z DEBUG opensleep::frozen::state] Message: FW: tec[right] safe, unlocking
+[2025-08-12T18:34:28Z DEBUG opensleep::frozen::state] Temperature update - Left: 2337, Right: 2287, Heatsink: 2437, Power: 8
+[2025-08-12T18:34:28Z DEBUG opensleep::frozen::state] Message: FW: pump[left] fast @ 11.711309V 0.405018A
+[2025-08-12T18:34:28Z DEBUG opensleep::frozen::state] Message: FW: pump[right] fast @ 11.767918V 0.410467A
+[2025-08-12T18:34:29Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T18:34:30Z DEBUG opensleep::sensor::state] Message: FW: [cap_sense] 1.1741 1.4773 1.6972 1.8612 1.9666 2.1146
+[2025-08-12T18:34:34Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T18:34:38Z DEBUG opensleep::frozen::state] Temperature update - Left: 2331, Right: 2287, Heatsink: 2437, Power: 8
+[2025-08-12T18:34:38Z DEBUG opensleep::frozen::state] Message: FW: pump[left] fast @ 11.767918V 0.400483A
+[2025-08-12T18:34:38Z DEBUG opensleep::frozen::state] Message: FW: pump[right] fast @ 11.771248V 0.400016A
+[2025-08-12T18:34:38Z DEBUG opensleep::frozen::state] Message: FW: [float_valve] solenoid_current @ 0.000010A
+[2025-08-12T18:34:38Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] solenoid_current @ 0.206058A
+...
+[2025-08-12T18:36:17Z DEBUG opensleep::frozen::state] Temperature update - Left: 2331, Right: 2287, Heatsink: 2437, Power: 8
+[2025-08-12T18:36:17Z DEBUG opensleep::frozen::state] Message: FW: pid[heatsink] 1.687500 0.831250 0.831250 0.000000 0.000000
+[2025-08-12T18:36:18Z DEBUG opensleep::frozen::state] Message: FW: pump[right] fast @ 11.714640V 0.397353A
+[2025-08-12T18:36:18Z DEBUG opensleep::frozen::state] Message: FW: [float_valve] solenoid_current @ 0.000015A
+[2025-08-12T18:36:18Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] solenoid_current @ 0.000445A
+[2025-08-12T18:36:18Z DEBUG opensleep::frozen::state] Message: FW: [stats] avg:7ms max:247ms min:0ms
+[2025-08-12T18:36:19Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T18:36:20Z DEBUG opensleep::frozen::state] Message: FW: [priming] purge.side (current: left)
+[2025-08-12T18:36:20Z DEBUG opensleep::frozen::state] Message: FW: tec[right] locked
+[2025-08-12T18:36:20Z DEBUG opensleep::sensor::state] Message: FW: [cap_sense] 1.2167 1.5406 1.7268 1.8307 2.0295 2.1300
+[2025-08-12T18:36:24Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T18:36:27Z DEBUG opensleep::frozen::state] Temperature update - Left: 2331, Right: 2287, Heatsink: 2437, Power: 8
+[2025-08-12T18:36:27Z DEBUG opensleep::frozen::state] Message: FW: pump[left] default @ 8.917511V 0.295428A
+[2025-08-12T18:36:27Z DEBUG opensleep::frozen::state] Message: FW: pump[right] off @ 0.079918V -0.000000A
+...
+[2025-08-12T18:38:17Z DEBUG opensleep::frozen::state] Message: FW: [float_valve] solenoid_current @ 0.000005A
+[2025-08-12T18:38:17Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] solenoid_current @ 0.000306A
+[2025-08-12T18:38:18Z DEBUG opensleep::frozen::state] Message: FW: [stats] avg:7ms max:248ms min:0ms
+[2025-08-12T18:38:19Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T18:38:20Z DEBUG opensleep::frozen::state] Message: FW: [priming] purge.side (other: right)
+[2025-08-12T18:38:20Z DEBUG opensleep::frozen::state] Message: FW: tec[left] locked
+[2025-08-12T18:38:20Z DEBUG opensleep::sensor::state] Message: FW: [cap_sense] 1.2088 1.4540 1.6209 1.9056 2.0114 2.1282
+[2025-08-12T18:38:24Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T18:38:25Z DEBUG opensleep::frozen::state] Message: FW: tec[right] safe, unlocking
+[2025-08-12T18:38:27Z DEBUG opensleep::frozen::state] Temperature update - Left: 2331, Right: 2293, Heatsink: 2437, Power: 8
+[2025-08-12T18:38:27Z DEBUG opensleep::frozen::state] Message: FW: pump[left] off @ 0.083248V 0.000001A
+[2025-08-12T18:38:27Z DEBUG opensleep::frozen::state] Message: FW: pump[right] default @ 8.899393V 0.282013A
+...
+[2025-08-12T18:40:17Z DEBUG opensleep::frozen::state] Message: FW: pump[right] default @ 8.917511V 0.286887A
+[2025-08-12T18:40:17Z DEBUG opensleep::frozen::state] Message: FW: [float_valve] solenoid_current @ 0.000015A
+[2025-08-12T18:40:17Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] solenoid_current @ 0.000311A
+[2025-08-12T18:40:17Z DEBUG opensleep::frozen::state] Message: FW: [stats] avg:7ms max:247ms min:0ms
+[2025-08-12T18:40:19Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T18:40:20Z DEBUG opensleep::frozen::state] Message: FW: [priming] purge.wait
+[2025-08-12T18:40:20Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] off - closed
+[2025-08-12T18:40:20Z DEBUG opensleep::frozen::state] Message: FW: tec[right] locked
+[2025-08-12T18:40:20Z DEBUG opensleep::sensor::state] Message: FW: [cap_sense] 1.1939 1.5136 1.7016 1.9734 1.9555 2.1081
+[2025-08-12T18:40:24Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T18:40:27Z DEBUG opensleep::frozen::state] Temperature update - Left: 2343, Right: 2281, Heatsink: 2431, Power: 8
+...
+[2025-08-12T18:41:17Z DEBUG opensleep::frozen::state] Temperature update - Left: 2356, Right: 2287, Heatsink: 2431, Power: 8
+[2025-08-12T18:41:17Z DEBUG opensleep::frozen::state] Message: FW: pid[heatsink] 1.625000 0.837500 0.837500 0.000000 0.000000
+[2025-08-12T18:41:17Z DEBUG opensleep::frozen::state] Message: FW: pump[left] off @ 0.003330V 0.000001A
+[2025-08-12T18:41:17Z DEBUG opensleep::frozen::state] Message: FW: pump[right] off @ 0.013320V 0.000000A
+[2025-08-12T18:41:17Z DEBUG opensleep::frozen::state] Message: FW: [float_valve] solenoid_current @ 0.000015A
+[2025-08-12T18:41:17Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] solenoid_current @ 0.000306A
+[2025-08-12T18:41:17Z DEBUG opensleep::frozen::state] Message: FW: [stats] avg:7ms max:242ms min:0ms
+[2025-08-12T18:41:19Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T18:41:20Z DEBUG opensleep::frozen::state] Message: FW: [priming] purge.empty, both pumps at 12v
+[2025-08-12T18:41:20Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] duty cycle - open 45000 ms / close 15000 ms
+[2025-08-12T18:41:20Z DEBUG opensleep::sensor::state] Message: FW: [cap_sense] 1.1747 1.5051 1.6641 1.8029 2.0291 2.0581
+[2025-08-12T18:41:24Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T18:41:25Z DEBUG opensleep::frozen::state] Message: FW: tec[left] safe, unlocking
+[2025-08-12T18:41:25Z DEBUG opensleep::frozen::state] Message: FW: tec[right] safe, unlocking
+[2025-08-12T18:41:27Z DEBUG opensleep::frozen::state] Temperature update - Left: 2343, Right: 2281, Heatsink: 2425, Power: 8
+[2025-08-12T18:41:27Z DEBUG opensleep::frozen::state] Message: FW: pump[left] fast @ 11.731289V 0.403484A
+[2025-08-12T18:41:27Z DEBUG opensleep::frozen::state] Message: FW: pump[right] fast @ 11.704650V 0.410421A
+...
+
+[2025-08-12T18:46:17Z DEBUG opensleep::frozen::state] Temperature update - Left: 2325, Right: 2281, Heatsink: 2412, Power: 8
+[2025-08-12T18:46:17Z DEBUG opensleep::frozen::state] Message: FW: pid[heatsink] 1.437500 0.856250 0.856250 0.000000 0.000000
+[2025-08-12T18:46:17Z DEBUG opensleep::frozen::state] Message: FW: pump[left] fast @ 11.731289V 0.413853A
+[2025-08-12T18:46:17Z DEBUG opensleep::frozen::state] Message: FW: pump[right] fast @ 11.724629V 0.385699A
+[2025-08-12T18:46:17Z DEBUG opensleep::frozen::state] Message: FW: [float_valve] solenoid_current @ 0.000025A
+[2025-08-12T18:46:17Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] solenoid_current @ 0.000423A
+[2025-08-12T18:46:17Z DEBUG opensleep::frozen::state] Message: FW: [stats] avg:7ms max:246ms min:0ms
+[2025-08-12T18:46:19Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T18:46:19Z DEBUG opensleep::frozen::state] Message: FW: [priming] 73 consecutive failed purges; 73 total failed
+[2025-08-12T18:46:19Z DEBUG opensleep::frozen::state] Message: FW: [priming] purge phase (5 iterations remaining)
+[2025-08-12T18:46:20Z DEBUG opensleep::frozen::state] Message: FW: [priming] purge.fast (120000 ms)
+[2025-08-12T18:46:20Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] on - open with timeout 45000
+[2025-08-12T18:46:20Z DEBUG opensleep::frozen::state] Message: FW: [priming] purge_fast stage purged? 0
+[2025-08-12T18:46:20Z DEBUG opensleep::sensor::state] Message: FW: [cap_sense] 1.2223 1.5186 1.6491 1.9098 2.0134 2.1075
+[2025-08-12T18:46:24Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T18:46:26Z DEBUG opensleep::frozen::state] Temperature update - Left: 2325, Right: 2281, Heatsink: 2412, Power: 8
+...
+[2025-08-12T18:48:16Z DEBUG opensleep::frozen::state] Message: FW: pid[heatsink] 1.437500 0.856250 0.856250 0.000000 0.000000
+[2025-08-12T18:48:16Z DEBUG opensleep::frozen::state] Message: FW: pump[left] fast @ 11.741279V 0.392919A
+[2025-08-12T18:48:16Z DEBUG opensleep::frozen::state] Message: FW: pump[right] fast @ 11.701320V 0.387915A
+[2025-08-12T18:48:16Z DEBUG opensleep::frozen::state] Message: FW: [float_valve] solenoid_current @ 0.000020A
+[2025-08-12T18:48:17Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] solenoid_current @ 0.000383A
+[2025-08-12T18:48:17Z DEBUG opensleep::frozen::state] Message: FW: [stats] avg:7ms max:245ms min:0ms
+[2025-08-12T18:48:17Z DEBUG opensleep::frozen::state] Temperature update - Left: 2325, Right: 2281, Heatsink: 2412, Power: 8
+[2025-08-12T18:48:19Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T18:48:19Z DEBUG opensleep::frozen::state] Message: FW: [priming] purge.side (current: right)
+[2025-08-12T18:48:19Z DEBUG opensleep::frozen::state] Message: FW: tec[left] locked
+[2025-08-12T18:48:20Z DEBUG opensleep::sensor::state] Message: FW: [cap_sense] 1.2067 1.5017 1.6362 1.9364 2.1406 2.0539
+...
+[2025-08-12T18:50:16Z DEBUG opensleep::frozen::state] Message: FW: pid[heatsink] 1.437500 0.856250 0.856250 0.000000 0.000000
+[2025-08-12T18:50:16Z DEBUG opensleep::frozen::state] Message: FW: pump[left] off @ 0.013320V 0.000000A
+[2025-08-12T18:50:16Z DEBUG opensleep::frozen::state] Message: FW: pump[right] default @ 8.945559V 0.298246A
+[2025-08-12T18:50:16Z DEBUG opensleep::frozen::state] Message: FW: [float_valve] solenoid_current @ 0.000000A
+[2025-08-12T18:50:16Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] solenoid_current @ 0.000323A
+[2025-08-12T18:50:16Z DEBUG opensleep::frozen::state] Message: FW: [stats] avg:7ms max:245ms min:0ms
+[2025-08-12T18:50:16Z DEBUG opensleep::frozen::state] Temperature update - Left: 2337, Right: 2281, Heatsink: 2412, Power: 8
+[2025-08-12T18:50:19Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T18:50:19Z DEBUG opensleep::frozen::state] Message: FW: [priming] purge.side (other: left)
+[2025-08-12T18:50:19Z DEBUG opensleep::frozen::state] Message: FW: tec[right] locked
+[2025-08-12T18:50:20Z DEBUG opensleep::sensor::state] Message: FW: [cap_sense] 1.2131 1.4571 1.6601 1.8372 1.8994 2.0734
+[2025-08-12T18:50:24Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T18:50:24Z DEBUG opensleep::frozen::state] Message: FW: tec[left] safe, unlocking
+[2025-08-12T18:50:26Z DEBUG opensleep::frozen::state] Temperature update - Left: 2337, Right: 2281, Heatsink: 2412, Power: 8
+[2025-08-12T18:50:26Z DEBUG opensleep::frozen::state] Message: FW: pump[left] default @ 8.950810V 0.298804A
+[2025-08-12T18:50:26Z DEBUG opensleep::frozen::state] Message: FW: pump[right] off @ 0.073258V 0.000001A
+...
+
+[2025-08-12T18:52:16Z DEBUG opensleep::frozen::state] Temperature update - Left: 2318, Right: 2293, Heatsink: 2406, Power: 8
+[2025-08-12T18:52:16Z DEBUG opensleep::frozen::state] Message: FW: pid[heatsink] 1.437500 0.862500 0.856250 0.000000 0.006250
+[2025-08-12T18:52:16Z DEBUG opensleep::frozen::state] Message: FW: pump[left] default @ 8.957470V 0.292612A
+[2025-08-12T18:52:16Z DEBUG opensleep::frozen::state] Message: FW: pump[right] off @ 0.003328V 0.000001A
+[2025-08-12T18:52:16Z DEBUG opensleep::frozen::state] Message: FW: [float_valve] solenoid_current @ 0.000010A
+[2025-08-12T18:52:16Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] solenoid_current @ 0.000303A
+[2025-08-12T18:52:16Z DEBUG opensleep::frozen::state] Message: FW: [stats] avg:7ms max:246ms min:0ms
+[2025-08-12T18:52:19Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T18:52:19Z DEBUG opensleep::frozen::state] Message: FW: [priming] purge.wait
+[2025-08-12T18:52:19Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] off - closed
+[2025-08-12T18:52:19Z DEBUG opensleep::frozen::state] Message: FW: tec[left] locked
+[2025-08-12T18:52:20Z DEBUG opensleep::sensor::state] Message: FW: [cap_sense] 1.2275 1.5073 1.6275 1.8923 1.9978 2.1518
+[2025-08-12T18:52:24Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T18:52:26Z DEBUG opensleep::frozen::state] Temperature update - Left: 2318, Right: 2293, Heatsink: 2412, Power: 8
+[2025-08-12T18:52:26Z DEBUG opensleep::frozen::state] Message: FW: pump[left] off @ 0.079918V 0.000000A
+[2025-08-12T18:52:26Z DEBUG opensleep::frozen::state] Message: FW: pump[right] off @ 0.000000V 0.000001A
+...
+
+[2025-08-12T18:53:16Z DEBUG opensleep::frozen::state] Temperature update - Left: 2325, Right: 2306, Heatsink: 2406, Power: 8
+[2025-08-12T18:53:16Z DEBUG opensleep::frozen::state] Message: FW: pid[heatsink] 1.437500 0.856250 0.856250 0.000000 0.000000
+[2025-08-12T18:53:16Z DEBUG opensleep::frozen::state] Message: FW: pump[left] off @ 0.026639V 0.000000A
+[2025-08-12T18:53:16Z DEBUG opensleep::frozen::state] Message: FW: pump[right] off @ 0.000000V 0.000001A
+[2025-08-12T18:53:16Z DEBUG opensleep::frozen::state] Message: FW: [float_valve] solenoid_current @ 0.000005A
+[2025-08-12T18:53:16Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] solenoid_current @ 0.000294A
+[2025-08-12T18:53:16Z DEBUG opensleep::frozen::state] Message: FW: [stats] avg:7ms max:242ms min:0ms
+[2025-08-12T18:53:19Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T18:53:19Z DEBUG opensleep::frozen::state] Message: FW: [priming] purge.empty, both pumps at 12v
+[2025-08-12T18:53:19Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] duty cycle - open 45000 ms / close 15000 ms
+[2025-08-12T18:53:20Z DEBUG opensleep::sensor::state] Message: FW: [cap_sense] 1.1721 1.4997 1.7397 1.8432 1.9912 2.1893
+[2025-08-12T18:53:24Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T18:53:24Z DEBUG opensleep::frozen::state] Message: FW: tec[right] safe, unlocking
+[2025-08-12T18:53:24Z DEBUG opensleep::frozen::state] Message: FW: tec[left] safe, unlocking
+[2025-08-12T18:53:26Z DEBUG opensleep::frozen::state] Temperature update - Left: 2325, Right: 2293, Heatsink: 2406, Power: 8
+[2025-08-12T18:53:26Z DEBUG opensleep::frozen::state] Message: FW: pump[left] fast @ 11.734619V 0.392087A
+[2025-08-12T18:53:26Z DEBUG opensleep::frozen::state] Message: FW: pump[right] fast @ 11.704650V 0.394363A
+...
+
+[2025-08-12T18:58:15Z DEBUG opensleep::frozen::state] Message: FW: pid[heatsink] 1.312500 0.868750 0.868750 0.000000 0.000000
+[2025-08-12T18:58:15Z DEBUG opensleep::frozen::state] Message: FW: pump[left] fast @ 11.741279V 0.407829A
+[2025-08-12T18:58:15Z DEBUG opensleep::frozen::state] Message: FW: pump[right] fast @ 11.711095V 0.389796A
+[2025-08-12T18:58:16Z DEBUG opensleep::frozen::state] Message: FW: [float_valve] solenoid_current @ 0.000015A
+[2025-08-12T18:58:16Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] solenoid_current @ 0.000415A
+[2025-08-12T18:58:16Z DEBUG opensleep::frozen::state] Message: FW: [stats] avg:7ms max:246ms min:0ms
+[2025-08-12T18:58:19Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T18:58:19Z DEBUG opensleep::frozen::state] Message: FW: [priming] 146 consecutive failed purges; 146 total failed
+[2025-08-12T18:58:19Z DEBUG opensleep::frozen::state] Message: FW: [priming] purge phase (4 iterations remaining)
+[2025-08-12T18:58:19Z DEBUG opensleep::frozen::state] Message: FW: [priming] purge.fast (120000 ms)
+[2025-08-12T18:58:19Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] on - open with timeout 45000
+[2025-08-12T18:58:19Z DEBUG opensleep::frozen::state] Message: FW: [priming] purge_fast stage purged? 0
+[2025-08-12T18:58:20Z DEBUG opensleep::sensor::state] Message: FW: [cap_sense] 1.2347 1.4908 1.6326 1.9235 2.0055 2.1065
+[2025-08-12T18:58:24Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T18:58:25Z DEBUG opensleep::frozen::state] Message: FW: pump[left] fast @ 11.801217V 0.402290A
+[2025-08-12T18:58:25Z DEBUG opensleep::frozen::state] Message: FW: pump[right] fast @ 11.711516V 0.404384A
+...
+
+[2025-08-12T19:00:15Z DEBUG opensleep::frozen::state] Message: FW: pid[heatsink] 1.937500 0.743750 0.806250 0.000000 -0.062500
+[2025-08-12T19:00:15Z DEBUG opensleep::frozen::state] Message: FW: pump[left] fast @ 11.661361V 0.390477A
+[2025-08-12T19:00:15Z DEBUG opensleep::frozen::state] Message: FW: pump[right] fast @ 11.744609V 0.368427A
+[2025-08-12T19:00:15Z DEBUG opensleep::frozen::state] Message: FW: pid[left] 23.187500 1.200938 1.143750 0.057187 0.000000
+[2025-08-12T19:00:15Z DEBUG opensleep::frozen::state] Message: FW: pid[right] 23.562500 0.976875 1.031250 0.058125 -0.112500
+[2025-08-12T19:00:15Z DEBUG opensleep::frozen::state] Message: FW: [float_valve] solenoid_current @ 0.000000A
+[2025-08-12T19:00:16Z DEBUG opensleep::frozen::state] Message: FW: [solenoid] solenoid_current @ -0.000016A
+[2025-08-12T19:00:16Z DEBUG opensleep::frozen::state] Message: FW: [stats] avg:11ms max:379ms min:0ms
+[2025-08-12T19:00:19Z DEBUG opensleep::frozen::state] Message: FW: [priming] purge.side (current: left)
+[2025-08-12T19:00:19Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T19:00:19Z DEBUG opensleep::frozen::state] Message: FW: tec[right] locked
+[2025-08-12T19:00:20Z DEBUG opensleep::sensor::state] Message: FW: [cap_sense] 1.2418 1.5014 1.6767 1.7919 2.0652 2.0291
+[2025-08-12T19:00:24Z DEBUG opensleep::sensor::manager] Ping
+[2025-08-12T19:00:25Z DEBUG opensleep::frozen::state] Temperature update - Left: 2325, Right: 2362, Heatsink: 2406, Power: 8
+[2025-08-12T19:00:25Z DEBUG opensleep::frozen::state] Message: FW: pump[left] default @ 8.917511V 0.268606A
+[2025-08-12T19:00:25Z DEBUG opensleep::frozen::state] Message: FW: pump[right] off @ 0.089908V 0.000001A

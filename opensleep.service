@@ -5,6 +5,7 @@ Description=Open Sleep
 WantedBy=multi-user.target
 
 [Service]
+Environment=RUST_LOG=info
 ExecStart=/opt/opensleep/opensleep
 WorkingDirectory=/opt/opensleep
 Restart=always

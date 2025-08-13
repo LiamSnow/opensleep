@@ -1,0 +1,32 @@
+(
+    timezone: "America/New_York",
+    away_mode: false,
+    prime: "15:00",
+    led: (
+        idle: BlueFire,
+        active: RedFire,      
+    ),
+    mqtt: (
+        server: "homeassistant.local",
+        port: 1883,
+        user: "example",
+        password: "1234"       
+    ),
+    profile: Solo(
+        (
+            temp_profile: [27, 29, 31],
+            sleep: "22:00",
+            wake: "10:30",
+            vibration: (
+                pattern: Rise,
+                intensity: 80,
+                duration: 600,
+                offset: 300,
+            ),
+            heat: (
+                temp: 100,
+                offset: 1800,
+            ),
+        )
+    ),
+)

@@ -1,73 +1,75 @@
-use frank::error::FrankError;
-use log::{info, LevelFilter, SetLoggerError};
-use scheduler::SchedulerError;
-use settings::{Settings, SettingsError};
-use simplelog::{ColorChoice, CombinedLogger, TermLogger, TerminalMode, WriteLogger};
-use thiserror::Error;
-use std::{fs::File, io, thread};
-use tokio::sync::watch;
+mod common;
+mod config;
+mod frozen;
+mod led;
+mod mqtt;
+mod presence;
+mod profile;
+mod reset;
+mod sensor;
 
-mod frank;
-mod scheduler;
-mod settings;
-mod api;
-mod stream;
+use config::Config;
+use tokio::sync::{broadcast, mpsc, watch};
 
-#[cfg(test)]
-mod test;
+use crate::{led::LEDController, presence::PresenseManager, reset::ResetController};
 
-pub const SETTINGS_FILE: &str = "settings.json";
-const LOG_FILE: &str = "opensleep.log";
+#[tokio::main]
+pub async fn main() {
+    env_logger::init();
+    log::info!("Starting OpenSleep...");
 
-#[derive(Error, Debug)]
-pub enum MainError {
-    #[error("api error: `{0}`")]
-    API(#[from] io::Error),
-    #[error("log file creation error: `{0}`")]
-    LogFileCreation(io::Error),
-    #[error("set logger error: `{0}`")]
-    SetLogger(#[from] SetLoggerError),
-    #[error("frank error: `{0}`")]
-    Frank(#[from] FrankError),
-    #[error("scheduler error: `{0}`")]
-    Scheduler(#[from] SchedulerError),
-    #[error("settings error: `{0}`")]
-    Settings(#[from] SettingsError),
-}
+    let config = Config::load("config.ron").unwrap();
+    log::info!("Configuration loaded successfully");
+    let (config_tx, config_rx) = watch::channel(config.clone());
+    tokio::spawn(config::auto_save(config_rx.clone()));
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> Result<(), MainError> {
-    CombinedLogger::init(vec![
-        TermLogger::new(
-            LevelFilter::Debug,
-            simplelog::Config::default(),
-            TerminalMode::Mixed,
-            ColorChoice::Auto,
-        ),
-        WriteLogger::new(
-            LevelFilter::Debug,
-            simplelog::Config::default(),
-            File::create(LOG_FILE)
-                .map_err(|e| MainError::LogFileCreation(e))?,
-        ),
-    ])?;
+    log::info!(
+        "Using timezone: {}",
+        config.timezone.iana_name().unwrap_or("Unknown")
+    );
 
-    info!("[Main] Open Sleep starting...");
+    // reset
+    let mut rc = ResetController::new().unwrap();
+    rc.reset_subsystems().await.unwrap();
+    let i2cdev = rc.take();
+    let mut led = LEDController::new(i2cdev);
+    // TODO proper led control in profile.rs
+    led.start_breathing((255, 0, 0)).unwrap();
 
-    info!("[Main] Reading settings file: {SETTINGS_FILE}");
-    let (settings_tx, settings_rx) = watch::channel(Settings::from_file(SETTINGS_FILE)?);
+    // make channels
+    let (presence_tx, presence_rx) = mpsc::channel(32);
+    let (calibrate_tx, calibrate_rx) = mpsc::channel(32);
+    let (frozen_command_tx, frozen_command_rx) = mpsc::channel(32);
+    let (frozen_update_tx, frozen_update_rx) = mpsc::channel(32);
+    let (sensor_update_tx, sensor_update_rx) = broadcast::channel(32);
 
-    info!("[Main] Starting Sleep Tracking Streamer");
-    //thread::spawn(|| stream::run_blocking());
+    // spawn tasks
+    frozen::spawn(frozen::PORT, frozen_command_rx, frozen_update_tx).unwrap();
+    sensor::run(sensor::PORT, sensor_update_tx).await.unwrap();
 
-    info!("[Main] Finding a Frank");
-    let (frank_tx, frank_state) = frank::run().await?;
+    PresenseManager::run(
+        config_tx.clone(),
+        config_rx.clone(),
+        sensor_update_rx.resubscribe(),
+        calibrate_rx,
+        presence_tx,
+    );
 
-    info!("[Main] Starting API server");
-    api::run(frank_state, settings_tx, settings_rx.clone()).await?;
+    log::info!("Initializing Profile Manager...");
+    profile::spawn(frozen_command_tx, config_rx.clone());
 
-    info!("[Main] Starting Scheduler...");
-    scheduler::run(frank_tx, settings_rx).await?;
+    log::info!("Initializing MQTT...");
+    mqtt::spawn(
+        config_tx.clone(),
+        config_rx.clone(),
+        sensor_update_rx,
+        frozen_update_rx,
+        presence_rx,
+        calibrate_tx,
+    );
 
-    Ok(())
+    tokio::select! {}
+
+    let _ = tokio::signal::ctrl_c().await;
+    log::info!("Shutting down OpenSleep...");
 }
