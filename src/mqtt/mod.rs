@@ -24,6 +24,8 @@ pub fn spawn(
     presense_state_rx: mpsc::Receiver<PresenceState>,
     calibrate_tx: mpsc::Sender<()>,
 ) {
+    log::info!("Initializing MQTT...");
+
     let cfg = config_rx.borrow().mqtt.clone();
 
     log::info!(

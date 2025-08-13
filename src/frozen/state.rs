@@ -1,6 +1,4 @@
-use std::sync::Arc;
-
-use tokio::sync::{Mutex, mpsc};
+use tokio::sync::mpsc;
 
 use crate::{
     common::{
@@ -28,50 +26,33 @@ pub struct FrozenState {
     pub hardware_info: Option<HardwareInfo>,
 }
 
-#[derive(Clone)]
-pub struct FrozenStateManager {
-    update_tx: mpsc::Sender<FrozenUpdate>,
-    state_lock: Arc<Mutex<FrozenState>>,
-}
-
-impl FrozenStateManager {
-    pub fn new(update_tx: mpsc::Sender<FrozenUpdate>) -> Self {
-        Self {
-            update_tx,
-            state_lock: Arc::new(Mutex::new(FrozenState::default())),
-        }
+impl FrozenState {
+    pub fn is_awake(&self) -> bool {
+        self.device_mode == DeviceMode::Firmware
     }
 
-    pub async fn is_ready(&self) -> bool {
-        self.state_lock.lock().await.device_mode == DeviceMode::Firmware
-    }
-
-    pub async fn set_device_mode(&self, mode: DeviceMode) {
-        let prev;
-
-        {
-            let mut state = self.state_lock.lock().await;
-            prev = state.device_mode;
-            state.device_mode = mode;
-        }
+    pub fn set_device_mode(
+        &mut self,
+        update_tx: &mut mpsc::Sender<FrozenUpdate>,
+        mode: DeviceMode,
+    ) {
+        let prev = self.device_mode;
+        self.device_mode = mode;
 
         if prev != mode {
             log::info!("Device mode: {prev:?} -> {mode:?}");
-            self.send_update(FrozenUpdate::DeviceMode(mode));
+            send_update(update_tx, FrozenUpdate::DeviceMode(mode));
         }
     }
 
-    fn send_update(&self, update: FrozenUpdate) {
-        if let Err(e) = self.update_tx.try_send(update) {
-            log::error!("Failed to send to state_tx: {e}");
-        }
-    }
-
-    pub async fn handle_packet(&self, packet: FrozenPacket) {
+    pub fn handle_packet(
+        &mut self,
+        update_tx: &mut mpsc::Sender<FrozenUpdate>,
+        packet: FrozenPacket,
+    ) {
         match packet {
             FrozenPacket::Pong(in_firmware) => {
-                self.set_device_mode(DeviceMode::from_pong(in_firmware))
-                    .await;
+                self.set_device_mode(update_tx, DeviceMode::from_pong(in_firmware));
             }
             FrozenPacket::TemperatureUpdate(u) => {
                 log::debug!(
@@ -81,9 +62,8 @@ impl FrozenStateManager {
                     u.heatsink_temp,
                     u.error
                 );
-                self.send_update(FrozenUpdate::Temperature(u.clone()));
-                let mut state = self.state_lock.lock().await;
-                state.temp = Some(u);
+                send_update(update_tx, FrozenUpdate::Temperature(u.clone()));
+                self.temp = Some(u);
             }
             FrozenPacket::TargetUpdate((side, u)) => {
                 log::debug!(
@@ -94,26 +74,23 @@ impl FrozenStateManager {
                 );
                 match side {
                     BedSide::Left => {
-                        self.send_update(FrozenUpdate::LeftTarget(u.clone()));
-                        let mut state = self.state_lock.lock().await;
-                        state.left_target = Some(u);
+                        send_update(update_tx, FrozenUpdate::LeftTarget(u.clone()));
+                        self.left_target = Some(u);
                     }
                     BedSide::Right => {
-                        self.send_update(FrozenUpdate::RightTarget(u.clone()));
-                        let mut state = self.state_lock.lock().await;
-                        state.right_target = Some(u);
+                        send_update(update_tx, FrozenUpdate::RightTarget(u.clone()));
+                        self.right_target = Some(u);
                     }
                 }
             }
             FrozenPacket::HardwareInfo(info) => {
                 log::info!("Hardware info: {info}");
-                self.send_update(FrozenUpdate::HardwareInfo(info.clone()));
-                let mut state = self.state_lock.lock().await;
-                state.hardware_info = Some(info);
+                send_update(update_tx, FrozenUpdate::HardwareInfo(info.clone()));
+                self.hardware_info = Some(info);
             }
             FrozenPacket::JumpingToFirmware(code) => {
                 log::debug!("Jumping to firmware with code: 0x{code:02X}");
-                self.set_device_mode(DeviceMode::Firmware).await;
+                self.set_device_mode(update_tx, DeviceMode::Firmware);
             }
             FrozenPacket::Message(msg) => {
                 if msg == "FW: water empty -> full" {
@@ -131,5 +108,11 @@ impl FrozenStateManager {
             }
             _ => {}
         }
+    }
+}
+
+fn send_update(update_tx: &mut mpsc::Sender<FrozenUpdate>, update: FrozenUpdate) {
+    if let Err(e) = update_tx.try_send(update) {
+        log::error!("Failed to send to state_tx: {e}");
     }
 }

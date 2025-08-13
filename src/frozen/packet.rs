@@ -209,9 +209,9 @@ mod tests {
         let result = FrozenPacket::parse(BytesMut::from(&data[..])).unwrap();
         match result {
             FrozenPacket::TemperatureUpdate(state) => {
-                assert_eq!(state.left_temp, 25.50);
-                assert_eq!(state.right_temp, 26.75);
-                assert_eq!(state.heatsink_temp, 23.00);
+                assert_eq!(state.left_temp, 2550);
+                assert_eq!(state.right_temp, 2675);
+                assert_eq!(state.heatsink_temp, 2300);
                 assert_eq!(state.error, 9);
                 assert_eq!(state.count, 0);
             }
@@ -222,10 +222,10 @@ mod tests {
         let result = FrozenPacket::parse(BytesMut::from(&data[..])).unwrap();
         match result {
             FrozenPacket::TemperatureUpdate(state) => {
-                assert_eq!(state.left_temp, 30.00);
-                assert_eq!(state.right_temp, 31.00);
-                assert_eq!(state.heatsink_temp, 27.00);
-                assert_eq!(state.error, 10); // cooling state
+                assert_eq!(state.left_temp, 3000);
+                assert_eq!(state.right_temp, 3100);
+                assert_eq!(state.heatsink_temp, 2700);
+                assert_eq!(state.error, 10);
                 assert_eq!(state.count, 255);
             }
             _ => panic!("Wrong packet type"),

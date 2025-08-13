@@ -2,12 +2,12 @@ use std::time::Duration;
 
 use crate::common::codec::PacketCodec;
 use crate::common::serial::{DeviceMode, SerialError, create_framed_port};
-use crate::sensor::state::SensorUpdate;
-use crate::sensor::{SensorCommand, SensorPacket, SensorStateManager};
+use crate::sensor::state::{SensorState, SensorUpdate};
+use crate::sensor::{SensorCommand, SensorPacket};
 use futures_util::stream::{SplitSink, SplitStream};
 use futures_util::{SinkExt, StreamExt};
-use tokio::sync::{broadcast, mpsc};
-use tokio::time::{interval, sleep, timeout};
+use tokio::sync::broadcast;
+use tokio::time::{Instant, interval, timeout};
 use tokio_serial::SerialStream;
 use tokio_util::codec::Framed;
 
@@ -15,246 +15,103 @@ pub const PORT: &str = "/dev/ttymxc0";
 const BOOTLOADER_BAUD: u32 = 38400;
 const FIRMWARE_BAUD: u32 = 115200;
 
+const COMMAND_INT: Duration = Duration::from_millis(50);
+const PING_INT: Duration = Duration::from_secs(5);
+const PROBE_INT: Duration = Duration::from_secs(5);
+const CONFIG_RES_TIME: Duration = Duration::from_millis(800);
+
 type Reader = SplitStream<Framed<SerialStream, PacketCodec<SensorPacket>>>;
 type Writer = SplitSink<Framed<SerialStream, PacketCodec<SensorPacket>>, SensorCommand>;
 
+struct CommandTimers {
+    last_ping: Instant,
+    last_probe: Instant,
+    last_hwinfo: Instant,
+    last_viben: Instant,
+    last_gain: Instant,
+    last_freq: Instant,
+    last_piezo: Instant,
+}
+
 pub async fn run(
     port: &'static str,
-    update_tx: broadcast::Sender<SensorUpdate>,
+    mut update_tx: broadcast::Sender<SensorUpdate>,
 ) -> Result<(), SerialError> {
     log::info!("Initializing Sensor Subsystem...");
 
-    let state_manager = SensorStateManager::new(update_tx);
+    let mut state = SensorState::default();
 
-    let (mut writer, mut reader) = discovery_task(port, &state_manager).await.unwrap();
+    let (mut writer, mut reader) = run_discovery(port, &mut update_tx, &mut state)
+        .await
+        .unwrap();
     log::info!("Connected");
 
-    // let read_handle = tokio::spawn(read_task(reader, state_manager.clone()));
-
-    // let (mut write_tx, write_rx) = mpsc::channel(10);
-    // let write_handle = tokio::spawn(write_task(writer, write_rx));
-
-    // if !state_manager.has_hardware_info().await {
-    //     tokio::spawn(try_get_hardware_info(
-    //         write_tx.clone(),
-    //         state_manager.clone(),
-    //     ));
-    // }
-
-    // tokio::spawn(try_enable_vibration(
-    //     write_tx.clone(),
-    //     state_manager.clone(),
-    // ));
-
-    // try_set_piezo_gain(&mut write_tx, &state_manager).await;
-
-    // try_enable_piezo(&mut write_tx, &state_manager).await;
-
-    // if let Err(e) = writer.send(cmd).await {
-    //     log::error!("Failed to send command: {e}");
-    // }
-
-    let mut interval = interval(Duration::from_secs(1));
-    let mut count = 0;
+    let mut interval = interval(COMMAND_INT);
+    let mut timers = CommandTimers::default();
 
     loop {
         tokio::select! {
-            Some(result) = reader.next() => {
-                match result {
-                    Ok(packet) => {
-                        state_manager.handle_packet(packet).await;
-                    }
-                    Err(e) => {
-                        log::error!("Packet decode error: {e}");
-                    }
+            Some(result) = reader.next() => match result {
+                Ok(packet) => {
+                    state.handle_packet(&mut update_tx, packet);
                 }
-            }
-
+                Err(e) => {
+                    log::error!("Packet decode error: {e}");
+                }
+            },
             _ = interval.tick() => {
-                match count {
-                    0 => {
-                        log::debug!("Ping");
-                        if let Err(e) = writer.send(SensorCommand::Ping).await {
-                            log::error!("Failed to ping: {e}");
-                        }
+                if let Some(cmd) = get_next_command(&mut timers, &state) {
+                    log::debug!(" -> {cmd:?}");
+                    if let Err(e) = writer.send(cmd).await {
+                        log::error!("Failed to send command: {e}");
                     }
-                    1 => {
-                        if let Err(e) = writer.send(SensorCommand::ProbeTemperature).await {
-                            log::error!("Failed to probe temp: {e}");
-                        }
-                    }
-                    2 =>  if !state_manager.has_hardware_info().await {
-                        if let Err(e) = writer.send(SensorCommand::GetHardwareInfo).await {
-                            log::error!("Failed to send GetHardwareInfo: {e}");
-                        }
-                    }
-                    3 => if !state_manager.vibration_enabled().await {
-                        if let Err(e) = writer.send(SensorCommand::EnableVibration).await {
-                            log::error!("Failed to send EnableVibration: {e}");
-                        }
-                    }
-                    4 => if !state_manager.piezo_gain_ok().await {
-                        if let Err(e) = writer.send(SensorCommand::SetPiezoGain400400).await {
-                            log::error!("Failed to send SetPiezoGain400400: {e}");
-                        }
-                    }
-                    5 => if !state_manager.piezo_ok().await {
-                        if let Err(e) = writer.send(SensorCommand::SetPiezoFreq1KHz).await {
-                            log::error!("Failed to send SetPiezoFreq1KHz: {e}");
-                        }
-
-                        sleep(Duration::from_millis(200)).await;
-
-                        if let Err(e) = writer.send(SensorCommand::EnablePiezo).await {
-                            log::error!("Failed to send SetPiezoFreq1KHz: {e}");
-                        }
-                    }
-                    _ => panic!()
-                }
-
-                count = (count + 1) % 5;
-            }
-        }
-    }
-}
-
-async fn try_get_hardware_info(
-    write_tx: mpsc::Sender<SensorCommand>,
-    state_manager: SensorStateManager,
-) {
-    for _ in 0..10 {
-        if let Err(e) = write_tx.send(SensorCommand::GetHardwareInfo).await {
-            log::error!("Failed to send GetHardwareInfo: {e}");
-        }
-
-        sleep(Duration::from_millis(500)).await;
-
-        if state_manager.has_hardware_info().await {
-            return;
-        }
-
-        sleep(Duration::from_millis(200)).await;
-    }
-
-    log::error!("Failed to get hardware info");
-}
-
-async fn try_enable_vibration(
-    write_tx: mpsc::Sender<SensorCommand>,
-    state_manager: SensorStateManager,
-) {
-    for _ in 0..10 {
-        if let Err(e) = write_tx.send(SensorCommand::EnableVibration).await {
-            log::error!("Failed to send EnableVibration: {e}");
-        }
-
-        sleep(Duration::from_millis(500)).await;
-
-        if state_manager.vibration_enabled().await {
-            return;
-        }
-
-        sleep(Duration::from_millis(200)).await;
-    }
-
-    log::error!("Failed to enable vibration");
-}
-
-async fn try_set_piezo_gain(
-    write_tx: &mut mpsc::Sender<SensorCommand>,
-    state_manager: &SensorStateManager,
-) {
-    for _ in 0..10 {
-        if let Err(e) = write_tx.send(SensorCommand::SetPiezoGain400400).await {
-            log::error!("Failed to send SetPiezoGain400400: {e}");
-        }
-
-        sleep(Duration::from_millis(200)).await;
-
-        if state_manager.piezo_gain_ok().await {
-            return;
-        }
-
-        sleep(Duration::from_millis(200)).await;
-    }
-
-    log::error!("Failed to set piezo gain");
-}
-
-async fn try_enable_piezo(
-    write_tx: &mut mpsc::Sender<SensorCommand>,
-    state_manager: &SensorStateManager,
-) {
-    for _ in 0..10 {
-        if let Err(e) = write_tx.send(SensorCommand::SetPiezoFreq1KHz).await {
-            log::error!("Failed to send SetPiezoFreq1KHz: {e}");
-        }
-
-        sleep(Duration::from_millis(200)).await;
-
-        if let Err(e) = write_tx.send(SensorCommand::EnablePiezo).await {
-            log::error!("Failed to send SetPiezoFreq1KHz: {e}");
-        }
-
-        sleep(Duration::from_millis(200)).await;
-
-        if state_manager.piezo_ok().await {
-            log::info!(
-                "Piezo sampling at {}Hz",
-                state_manager.piezo_freq().await.unwrap_or(0)
-            );
-            return;
-        }
-
-        sleep(Duration::from_millis(200)).await;
-    }
-
-    log::error!("Failed to enable piezo");
-}
-
-async fn write_task(mut writer: Writer, mut write_tx: mpsc::Receiver<SensorCommand>) {
-    let mut interval = interval(Duration::from_secs(5));
-    loop {
-        tokio::select! {
-            Some(cmd) = write_tx.recv() => {
-                if let Err(e) = writer.send(cmd).await {
-                    log::error!("Failed to send command: {e}");
-                }
-            }
-            _ = interval.tick() => {
-                log::debug!("Ping");
-                if let Err(e) = writer.send(SensorCommand::Ping).await {
-                    log::error!("Failed to ping: {e}");
-                }
-                sleep(Duration::from_millis(200)).await;
-                if let Err(e) = writer.send(SensorCommand::ProbeTemperature).await {
-                    log::error!("Failed to probe temp: {e}");
                 }
             }
         }
     }
 }
 
-async fn read_task(mut reader: Reader, state_manager: SensorStateManager) {
-    while let Some(result) = reader.next().await {
-        match result {
-            Ok(packet) => {
-                state_manager.handle_packet(packet).await;
-            }
-            Err(e) => {
-                log::error!("Packet decode error: {e}");
-            }
-        }
+fn get_next_command(timers: &mut CommandTimers, state: &SensorState) -> Option<SensorCommand> {
+    let now = Instant::now();
+    if now.duration_since(timers.last_ping) > PING_INT {
+        timers.last_ping = now;
+        Some(SensorCommand::Ping)
+    } else if now.duration_since(timers.last_probe) > PROBE_INT {
+        timers.last_probe = now;
+        Some(SensorCommand::ProbeTemperature)
+    } else if now.duration_since(timers.last_hwinfo) > CONFIG_RES_TIME
+        && state.hardware_info.is_none()
+    {
+        timers.last_hwinfo = now;
+        Some(SensorCommand::GetHardwareInfo)
+    } else if now.duration_since(timers.last_viben) > CONFIG_RES_TIME && !state.vibration_enabled {
+        timers.last_viben = now;
+        Some(SensorCommand::EnableVibration)
+    } else if now.duration_since(timers.last_gain) > CONFIG_RES_TIME && !state.piezo_gain_ok() {
+        timers.last_gain = now;
+        Some(SensorCommand::SetPiezoGain400400)
+    } else if now.duration_since(timers.last_freq) > CONFIG_RES_TIME
+        && state.piezo_enabled
+        && !state.piezo_freq_ok()
+    {
+        timers.last_freq = now;
+        Some(SensorCommand::SetPiezoFreq1KHz)
+    } else if now.duration_since(timers.last_piezo) > CONFIG_RES_TIME && !state.piezo_enabled {
+        timers.last_piezo = now;
+        Some(SensorCommand::EnablePiezo)
+    } else {
+        None
     }
 }
 
-async fn discovery_task(
+async fn run_discovery(
     port: &'static str,
-    state_manager: &SensorStateManager,
+    update_tx: &mut broadcast::Sender<SensorUpdate>,
+    state: &mut SensorState,
 ) -> Result<(Writer, Reader), SerialError> {
     // try bootloader first
     if let Ok((mut writer, mut reader)) =
-        ping_device(port, DeviceMode::Bootloader, state_manager).await
+        ping_device(port, update_tx, state, DeviceMode::Bootloader).await
     {
         writer
             .send(SensorCommand::JumpToFirmware)
@@ -262,20 +119,21 @@ async fn discovery_task(
             .map_err(|e| SerialError::Io(std::io::Error::other(e)))?;
 
         // wait for mode switch
-        wait_for_mode(&mut reader, state_manager, DeviceMode::Firmware).await?;
+        wait_for_mode(&mut reader, update_tx, state, DeviceMode::Firmware).await?;
 
         return Ok(create_framed_port::<SensorPacket>(port, FIRMWARE_BAUD)?.split());
     }
 
     // try firmware (happens if program was recently running)
     log::info!("Trying Firmware mode");
-    ping_device(port, DeviceMode::Firmware, state_manager).await
+    ping_device(port, update_tx, state, DeviceMode::Firmware).await
 }
 
 async fn ping_device(
     port: &'static str,
+    update_tx: &mut broadcast::Sender<SensorUpdate>,
+    state: &mut SensorState,
     mode: DeviceMode,
-    state_manager: &SensorStateManager,
 ) -> Result<(Writer, Reader), SerialError> {
     let baud = if mode == DeviceMode::Bootloader {
         BOOTLOADER_BAUD
@@ -291,8 +149,8 @@ async fn ping_device(
             .map_err(|e| SerialError::Io(std::io::Error::other(e)))?;
 
         if let Ok(Some(Ok(packet))) = timeout(Duration::from_millis(500), reader.next()).await {
-            state_manager.set_device_mode(mode).await;
-            state_manager.handle_packet(packet).await;
+            state.set_device_mode(update_tx, mode);
+            state.handle_packet(update_tx, packet);
             return Ok((writer, reader));
         }
     }
@@ -305,13 +163,14 @@ async fn ping_device(
 
 async fn wait_for_mode(
     reader: &mut Reader,
-    state_manager: &SensorStateManager,
+    update_tx: &mut broadcast::Sender<SensorUpdate>,
+    state: &mut SensorState,
     target_mode: DeviceMode,
 ) -> Result<(), SerialError> {
     let timeout_duration = Duration::from_secs(5);
     let start = std::time::Instant::now();
 
-    while state_manager.device_mode().await != target_mode {
+    while state.device_mode != target_mode {
         if start.elapsed() > timeout_duration {
             return Err(SerialError::Io(std::io::Error::new(
                 std::io::ErrorKind::TimedOut,
@@ -320,9 +179,25 @@ async fn wait_for_mode(
         }
 
         if let Some(Ok(packet)) = reader.next().await {
-            state_manager.handle_packet(packet).await;
+            state.handle_packet(update_tx, packet);
         }
     }
 
     Ok(())
+}
+
+impl Default for CommandTimers {
+    fn default() -> Self {
+        let now = Instant::now();
+        Self {
+            last_ping: now,
+            // stagger commands
+            last_probe: now + Duration::from_millis(2500),
+            last_hwinfo: now,
+            last_viben: now,
+            last_gain: now,
+            last_freq: now,
+            last_piezo: now,
+        }
+    }
 }

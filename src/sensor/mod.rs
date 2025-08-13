@@ -6,4 +6,3 @@ pub mod state;
 pub use command::SensorCommand;
 pub use manager::{PORT, run};
 pub use packet::SensorPacket;
-pub use state::SensorStateManager;

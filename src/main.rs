@@ -43,33 +43,53 @@ pub async fn main() {
     let (frozen_update_tx, frozen_update_rx) = mpsc::channel(32);
     let (sensor_update_tx, sensor_update_rx) = broadcast::channel(32);
 
-    // spawn tasks
-    frozen::spawn(frozen::PORT, frozen_command_rx, frozen_update_tx).unwrap();
-    sensor::run(sensor::PORT, sensor_update_tx).await.unwrap();
-
-    PresenseManager::run(
-        config_tx.clone(),
-        config_rx.clone(),
-        sensor_update_rx.resubscribe(),
-        calibrate_rx,
-        presence_tx,
-    );
-
-    log::info!("Initializing Profile Manager...");
-    profile::spawn(frozen_command_tx, config_rx.clone());
-
-    log::info!("Initializing MQTT...");
     mqtt::spawn(
         config_tx.clone(),
         config_rx.clone(),
-        sensor_update_rx,
+        sensor_update_rx.resubscribe(),
         frozen_update_rx,
         presence_rx,
         calibrate_tx,
     );
 
-    tokio::select! {}
+    tokio::select! {
+        biased;
 
-    let _ = tokio::signal::ctrl_c().await;
+        _ = tokio::signal::ctrl_c() => {
+            log::info!("Received ctrl+c signal");
+        }
+
+        res = frozen::run(frozen::PORT, frozen_command_rx, frozen_update_tx) => {
+            match res {
+                Ok(_) => log::warn!("Frozen task unexpectedly exited"),
+                Err(e) => log::error!("Frozen task failed: {e}"),
+            }
+        }
+
+        res = sensor::run(sensor::PORT, sensor_update_tx) => {
+            match res {
+                Ok(_) => log::warn!("Sensor task unexpectedly exited"),
+                Err(e) => log::error!("Sensor task failed: {e}"),
+            }
+        }
+
+        _ = PresenseManager::run(
+            config_tx.clone(),
+            config_rx.clone(),
+            sensor_update_rx.resubscribe(),
+            calibrate_rx,
+            presence_tx,
+        ) => {
+            log::warn!("Presence manager task unexpectedly completed");
+        }
+
+        result = profile::run(frozen_command_tx, config_rx.clone()) => {
+            match result {
+                Ok(_) => log::warn!("Profile task unexpectedly exited"),
+                Err(e) => log::error!("Profile task failed: {e}"),
+            }
+        }
+    }
+
     log::info!("Shutting down OpenSleep...");
 }
