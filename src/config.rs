@@ -1,11 +1,15 @@
 use jiff::{civil::Time, tz::TimeZone};
 use log::{debug, error};
+use ron::extensions::Extensions;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fs;
 use strum_macros::{Display, EnumString};
 use thiserror::Error;
 use tokio::sync::watch;
 use tokio::time::{Duration, MissedTickBehavior};
+
+use crate::common::packet::BedSide;
+use crate::led::LedPattern;
 
 const CONFIG_FILE: &str = "config.ron";
 
@@ -19,20 +23,12 @@ pub enum ConfigError {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Display, EnumString)]
 #[strum(serialize_all = "lowercase")]
-pub enum LedPattern {
-    Blue,
-    BlueFire,
-    RedFire,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Display, EnumString)]
-#[strum(serialize_all = "lowercase")]
 pub enum VibrationPattern {
     Rise = 0,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct LedConfig {
+pub struct LEDConfig {
     pub idle: LedPattern,
     pub active: LedPattern,
 }
@@ -50,12 +46,6 @@ pub struct VibrationConfig {
     pub pattern: VibrationPattern,
     pub intensity: u8,
     pub duration: u32,
-    pub offset: u32,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct HeatConfig {
-    pub temp: u8,
     pub offset: u32,
 }
 
@@ -85,20 +75,21 @@ fn timezone_ser<S: Serializer>(tz: &TimeZone, serializer: S) -> Result<S::Ok, S:
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Profile {
-    pub temp_profile: Vec<i32>,
+pub struct SideConfig {
+    /// degrees celcius
+    pub temp_profile: Vec<f32>,
     #[serde(deserialize_with = "time_de", serialize_with = "time_ser")]
     pub sleep: Time,
     #[serde(deserialize_with = "time_de", serialize_with = "time_ser")]
     pub wake: Time,
-    pub vibration: VibrationConfig,
-    pub heat: HeatConfig,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vibration: Option<VibrationConfig>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum ProfileType {
-    Solo(Profile),
-    Couples { left: Profile, right: Profile },
+pub enum SideConfigType {
+    Solo(SideConfig),
+    Couples { left: SideConfig, right: SideConfig },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -108,9 +99,9 @@ pub struct Config {
     pub away_mode: bool,
     #[serde(deserialize_with = "time_de", serialize_with = "time_ser")]
     pub prime: Time,
-    pub led: LedConfig,
+    pub led: LEDConfig,
     pub mqtt: MqttConfig,
-    pub profile: ProfileType,
+    pub side_config: SideConfigType,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub presence: Option<PresenceConfig>,
 }
@@ -118,7 +109,8 @@ pub struct Config {
 impl Config {
     pub fn load(path: &str) -> Result<Self, ConfigError> {
         let content = fs::read_to_string(path)?;
-        let config = ron::from_str(&content)?;
+        let opts = ron::Options::default().with_default_extension(Extensions::IMPLICIT_SOME);
+        let config = opts.from_str(&content)?;
         Ok(config)
     }
 
@@ -130,40 +122,56 @@ impl Config {
     }
 }
 
-impl ProfileType {
-    #[allow(dead_code)]
-    pub fn get_profile(&self, side: Option<&str>) -> Option<&Profile> {
-        match (self, side) {
-            (ProfileType::Solo(profile), _) => Some(profile),
-            (ProfileType::Couples { left, .. }, Some("left")) => Some(left),
-            (ProfileType::Couples { right, .. }, Some("right")) => Some(right),
-            (ProfileType::Couples { .. }, _) => None,
+impl SideConfigType {
+    pub fn get_side(&self, side: &BedSide) -> &SideConfig {
+        match self {
+            SideConfigType::Solo(cfg) => cfg,
+            SideConfigType::Couples { left, right } => match side {
+                BedSide::Left => left,
+                BedSide::Right => right,
+            },
         }
     }
 
-    pub fn get_profile_mut(&mut self, side: Option<&str>) -> Option<&mut Profile> {
+    pub fn get_right(&self) -> &SideConfig {
+        match self {
+            SideConfigType::Solo(p) => p,
+            SideConfigType::Couples { right, .. } => right,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn get_profile(&self, side: Option<&str>) -> Option<&SideConfig> {
         match (self, side) {
-            (ProfileType::Solo(profile), _) => Some(profile),
-            (ProfileType::Couples { left, .. }, Some("left")) => Some(left),
-            (ProfileType::Couples { right, .. }, Some("right")) => Some(right),
-            (ProfileType::Couples { .. }, _) => None,
+            (SideConfigType::Solo(profile), _) => Some(profile),
+            (SideConfigType::Couples { left, .. }, Some("left")) => Some(left),
+            (SideConfigType::Couples { right, .. }, Some("right")) => Some(right),
+            (SideConfigType::Couples { .. }, _) => None,
+        }
+    }
+
+    pub fn get_profile_mut(&mut self, side: Option<&str>) -> Option<&mut SideConfig> {
+        match (self, side) {
+            (SideConfigType::Solo(profile), _) => Some(profile),
+            (SideConfigType::Couples { left, .. }, Some("left")) => Some(left),
+            (SideConfigType::Couples { right, .. }, Some("right")) => Some(right),
+            (SideConfigType::Couples { .. }, _) => None,
         }
     }
 
     #[allow(dead_code)]
     pub fn is_solo(&self) -> bool {
-        matches!(self, ProfileType::Solo(_))
+        matches!(self, SideConfigType::Solo(_))
     }
 
     #[allow(dead_code)]
     pub fn is_couples(&self) -> bool {
-        matches!(self, ProfileType::Couples { .. })
+        matches!(self, SideConfigType::Couples { .. })
     }
 }
 
 // saves config changes to file debounced
-pub async fn auto_save(config_rx: watch::Receiver<Config>) {
-    let mut config_rx = config_rx;
+pub async fn auto_save(mut config_rx: watch::Receiver<Config>) {
     let mut save_timer = tokio::time::interval(Duration::from_millis(500));
     save_timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
@@ -198,9 +206,9 @@ mod tests {
         let config = Config::load("example_solo.ron").unwrap();
         assert_eq!(config.timezone.iana_name().unwrap(), "America/New_York");
         assert!(!config.away_mode);
-        match &config.profile {
-            ProfileType::Solo(profile) => {
-                assert_eq!(profile.temp_profile, vec![27, 29, 31]);
+        match &config.side_config {
+            SideConfigType::Solo(profile) => {
+                assert_eq!(profile.temp_profile, vec![27., 29., 31.]);
             }
             _ => panic!("Expected solo profile"),
         }
@@ -211,10 +219,10 @@ mod tests {
         let config = Config::load("example_couples.ron").unwrap();
         assert_eq!(config.timezone.iana_name().unwrap(), "America/New_York");
         assert!(!config.away_mode);
-        match &config.profile {
-            ProfileType::Couples { left, right } => {
-                assert_eq!(left.temp_profile, vec![27, 29, 31]);
-                assert_eq!(right.temp_profile, vec![27, 29, 31]);
+        match &config.side_config {
+            SideConfigType::Couples { left, right } => {
+                assert_eq!(left.temp_profile, vec![27., 29., 31.]);
+                assert_eq!(right.temp_profile, vec![27., 29., 31.]);
             }
             _ => panic!("Expected couples profile"),
         }

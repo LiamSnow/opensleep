@@ -5,7 +5,7 @@ use crate::{
         packet::{BedSide, HardwareInfo},
         serial::DeviceMode,
     },
-    frozen::packet::{FrozenPacket, TargetUpdate, TemperatureUpdate},
+    frozen::packet::{FrozenPacket, FrozenTarget, TemperatureUpdate},
 };
 
 #[derive(Clone, Debug)]
@@ -13,17 +13,18 @@ pub enum FrozenUpdate {
     DeviceMode(DeviceMode),
     HardwareInfo(HardwareInfo),
     Temperature(TemperatureUpdate),
-    LeftTarget(TargetUpdate),
-    RightTarget(TargetUpdate),
+    LeftTarget(FrozenTarget),
+    RightTarget(FrozenTarget),
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FrozenState {
     pub device_mode: DeviceMode,
     pub temp: Option<TemperatureUpdate>,
-    pub left_target: Option<TargetUpdate>,
-    pub right_target: Option<TargetUpdate>,
+    pub left_target: Option<FrozenTarget>,
+    pub right_target: Option<FrozenTarget>,
     pub hardware_info: Option<HardwareInfo>,
+    pub is_priming: bool,
 }
 
 impl FrozenState {
@@ -45,6 +46,10 @@ impl FrozenState {
         }
     }
 
+    pub fn is_active(&self) -> bool {
+        self.left_target.is_some() || self.right_target.is_some()
+    }
+
     pub fn handle_packet(
         &mut self,
         update_tx: &mut mpsc::Sender<FrozenUpdate>,
@@ -56,7 +61,7 @@ impl FrozenState {
             }
             FrozenPacket::TemperatureUpdate(u) => {
                 log::debug!(
-                    "Temperature update - Left: {:.1}, Right: {:.1}, Heatsink: {:.1}, Power: {}",
+                    "Temperature update - Left: {:.1}, Right: {:.1}, Heatsink: {:.1}, Error: {}",
                     u.left_temp,
                     u.right_temp,
                     u.heatsink_temp,
@@ -69,7 +74,7 @@ impl FrozenState {
                 log::debug!(
                     "Target update - Side: {:?}, Enabled: {}, Temp: {:.1}",
                     side,
-                    u.state,
+                    u.enabled,
                     u.temp
                 );
                 match side {
@@ -98,7 +103,28 @@ impl FrozenState {
                 } else if msg == "FW: water full -> empty" {
                     log::warn!("Water tank removed");
                 } else if let Some(stripped) = msg.strip_prefix("FW: [priming] ") {
+                    // done because empty
+                    // done
+                    // empty stage pause pumps for %u ms
+                    // empty phase (%u remaining; runtime %u ms)
+                    // empty stage finished w/ %u successful purge
+                    // purge phase
+                    // purge.fast (%u ms)
+                    // purge_fast stage purged? %u
+                    // start
+                    // %u consecutive failed purges; %u total failed
+                    // purge phase (%u iterations remaining)
+                    // purge phase complete. now final empty stage
+                    // purge.wait
+                    // purge.side (%s: %s)
+                    // purge.empty, both pumps at 12v
                     log::info!("Priming Message: {stripped}");
+
+                    match stripped {
+                        "done" | "done because empty" => self.is_priming = false,
+                        "start" => self.is_priming = true,
+                        _ => {}
+                    }
                 } else {
                     log::debug!("Message: {msg}")
                 }

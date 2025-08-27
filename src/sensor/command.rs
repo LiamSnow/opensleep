@@ -1,106 +1,92 @@
+use strum_macros::FromRepr;
+
 use crate::common::{
     checksum,
-    codec::{CommandTrait, START},
+    codec::{CommandTrait, command},
     packet::BedSide,
 };
-use hex_literal::hex;
 
 #[derive(Debug, Clone)]
 pub enum SensorCommand {
     Ping,
-    #[allow(dead_code)]
     GetHardwareInfo,
     #[allow(dead_code)]
     GetFirmwareHash,
     JumpToFirmware,
-    SetPiezoGain400400,
-    SetPiezoFreq1KHz,
+    SetPiezoGain(u16, u16),
+    #[allow(dead_code)]
+    GetPiezoFreq,
+    SetPiezoFreq(u32),
     EnablePiezo,
+    // TODO add resp packet + 0x80
+    #[allow(dead_code)]
+    DisablePiezo,
     EnableVibration,
+    #[allow(dead_code)]
     ProbeTemperature,
-    Alarm(AlarmCommand),
+    SetAlarm(AlarmCommand),
+    // TODO add resp packet + 0x80
+    /// UNVERIFIED
+    #[allow(dead_code)]
+    ClearAlarm,
+    // TODO add resp packet + 0x80
+    #[allow(dead_code)]
+    GetHeaterOffset,
+    Random(u8),
 }
 
 impl CommandTrait for SensorCommand {
     fn to_bytes(&self) -> Vec<u8> {
         use SensorCommand::*;
         match self {
-            Ping => hex!("7E 01 01 DC BD").to_vec(),
-            GetHardwareInfo => hex!("7E 01 02 EC DE").to_vec(),
-            GetFirmwareHash => hex!("7E 01 04 8C 18").to_vec(),
-            JumpToFirmware => hex!("7E 01 10 DE AD").to_vec(),
-            SetPiezoGain400400 => hex!("7E 05 2B 01 90 01 90 AB 80").to_vec(),
-            SetPiezoFreq1KHz => hex!("7E 05 21 00 00 03 E8 7A 5E").to_vec(),
-            EnablePiezo => hex!("7E 01 28 69 F6").to_vec(),
-            EnableVibration => hex!("7E 01 2E 09 30").to_vec(),
-            ProbeTemperature => hex!("7E 02 2F FF 8C E8").to_vec(),
-            Alarm(cmd) => {
-                make_alarm_command(cmd.side, cmd.intensity, cmd.duration, cmd.pattern).to_vec()
+            Ping => command(vec![0x01]),
+            GetHardwareInfo => command(vec![0x02]),
+            GetFirmwareHash => command(vec![0x04]),
+            JumpToFirmware => command(vec![0x10]),
+            GetPiezoFreq => command(vec![0x20]),
+            SetPiezoFreq(freq) => command(vec![
+                0x21,
+                (*freq >> 24) as u8,
+                (*freq >> 16) as u8,
+                (*freq >> 8) as u8,
+                *freq as u8,
+            ]),
+            EnablePiezo => command(vec![0x28]),
+            DisablePiezo => command(vec![0x29]),
+            SetPiezoGain(gain1, gain2) => command(vec![
+                0x2B,
+                (*gain1 >> 8) as u8,
+                *gain1 as u8,
+                (*gain2 >> 8) as u8,
+                *gain2 as u8,
+            ]),
+            EnableVibration => command(vec![0x2E]),
+            ProbeTemperature => command(vec![0x2F, 0xFF]),
+            GetHeaterOffset => command(vec![0x2A]),
+            Random(cmd) => command(vec![*cmd]),
+            SetAlarm(cmd) => {
+                let payload = vec![
+                    0x2C,
+                    cmd.side as u8,
+                    cmd.intensity,
+                    cmd.pattern as u8,
+                    (cmd.duration >> 24) as u8,
+                    (cmd.duration >> 16) as u8,
+                    (cmd.duration >> 8) as u8,
+                    cmd.duration as u8,
+                ];
+                command(payload)
             }
+            ClearAlarm => command(vec![0x2D]),
         }
     }
 }
 
-const fn make_alarm_command(
-    side: BedSide,
-    intensity: u8,
-    duration: u32,
-    pattern: AlarmPattern,
-) -> [u8; 12] {
-    let payload = [
-        0x2c,
-        side as u8,
-        intensity,
-        pattern.to_byte(),
-        (duration >> 24) as u8,
-        (duration >> 16) as u8,
-        (duration >> 8) as u8,
-        duration as u8,
-    ];
-
-    let checksum = checksum::compute(&payload);
-
-    [
-        START,
-        0x08,
-        payload[0],
-        payload[1],
-        payload[2],
-        payload[3],
-        payload[4],
-        payload[5],
-        payload[6],
-        payload[7],
-        (checksum >> 8) as u8,
-        checksum as u8,
-    ]
-}
-
-#[derive(Debug, PartialEq, Clone, Copy)]
-#[allow(dead_code)]
+#[derive(Debug, PartialEq, Clone, Copy, FromRepr)]
+#[repr(u8)]
 pub enum AlarmPattern {
-    /// Normal pattern
-    Normal,
-    /// Rise pattern
-    Rise,
-}
-
-impl AlarmPattern {
-    pub const fn to_byte(&self) -> u8 {
-        match self {
-            Self::Normal => 0x00,
-            Self::Rise => 0x01,
-        }
-    }
-
-    #[allow(dead_code)]
-    pub const fn from_byte(val: u8) -> Option<Self> {
-        match val {
-            0x00 => Some(Self::Normal),
-            0x01 => Some(Self::Rise),
-            _ => None,
-        }
-    }
+    Single = 0x00,
+    Double = 0x01,
 }
 
 #[derive(Debug, Clone)]
@@ -129,20 +115,63 @@ mod tests {
     use hex_literal::hex;
 
     #[test]
+    fn test_sensor_commands() {
+        assert_eq!(
+            SensorCommand::Ping.to_bytes(),
+            hex!("7E 01 01 DC BD").to_vec()
+        );
+        assert_eq!(
+            SensorCommand::GetHardwareInfo.to_bytes(),
+            hex!("7E 01 02 EC DE").to_vec()
+        );
+        assert_eq!(
+            SensorCommand::GetFirmwareHash.to_bytes(),
+            hex!("7E 01 04 8C 18").to_vec()
+        );
+        assert_eq!(
+            SensorCommand::JumpToFirmware.to_bytes(),
+            hex!("7E 01 10 DE AD").to_vec()
+        );
+        assert_eq!(
+            SensorCommand::SetPiezoFreq(1000).to_bytes(),
+            hex!("7E 05 21 00 00 03 E8 7A 5E").to_vec()
+        );
+        assert_eq!(
+            SensorCommand::EnablePiezo.to_bytes(),
+            hex!("7E 01 28 69 F6").to_vec()
+        );
+        assert_eq!(
+            SensorCommand::SetPiezoGain(400, 400).to_bytes(),
+            hex!("7E 05 2B 01 90 01 90 AB 80").to_vec()
+        );
+        assert_eq!(
+            SensorCommand::EnableVibration.to_bytes(),
+            hex!("7E 01 2E 09 30").to_vec()
+        );
+        assert_eq!(
+            SensorCommand::ProbeTemperature.to_bytes(),
+            hex!("7E 02 2F FF 8C E8").to_vec()
+        );
+    }
+
+    #[test]
     fn test_alarm_command() {
+        let alarm1 = AlarmCommand::new(BedSide::Right, 100, 20, AlarmPattern::Single);
         assert_eq!(
-            make_alarm_command(BedSide::Right, 100, 20, AlarmPattern::Normal),
-            hex!("7e 08 2c 01 64 00 00 00 00 14 38 8b")
+            SensorCommand::SetAlarm(alarm1).to_bytes(),
+            hex!("7e 08 2c 01 64 00 00 00 00 14 38 8b").to_vec()
         );
 
+        let alarm2 = AlarmCommand::new(BedSide::Left, 50, 50, AlarmPattern::Single);
         assert_eq!(
-            make_alarm_command(BedSide::Left, 50, 50, AlarmPattern::Normal),
-            hex!("7e 08 2c 00 32 00 00 00 00 32 39 3b")
+            SensorCommand::SetAlarm(alarm2).to_bytes(),
+            hex!("7e 08 2c 00 32 00 00 00 00 32 39 3b").to_vec()
         );
 
+        let alarm3 = AlarmCommand::new(BedSide::Left, 50, 0, AlarmPattern::Double);
         assert_eq!(
-            make_alarm_command(BedSide::Left, 50, 0, AlarmPattern::Rise),
-            hex!("7e 08 2c 00 32 01 00 00 00 00 85 7b")
+            SensorCommand::SetAlarm(alarm3).to_bytes(),
+            hex!("7e 08 2c 00 32 01 00 00 00 00 85 7b").to_vec()
         );
     }
 }

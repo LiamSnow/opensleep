@@ -1,7 +1,7 @@
 use bytes::BytesMut;
 
 use crate::common::packet::{
-    self, BedSide, HardwareInfo, Packet, PacketError, validate_packet_size,
+    self, BedSide, HardwareInfo, Packet, PacketError, invalid_structure, validate_packet_size,
 };
 
 #[derive(Debug, PartialEq)]
@@ -14,15 +14,16 @@ pub enum FrozenPacket {
     Message(String),
     /// unknown value, always (0,1)
     Heartbeat(u8, u8),
-    TargetUpdate((BedSide, TargetUpdate)),
+    TargetUpdate((BedSide, FrozenTarget)),
     TemperatureUpdate(TemperatureUpdate),
+    GetTemperature(GetTemperature),
     PrimingStarted,
     GetFirmware,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct TargetUpdate {
-    pub state: bool,
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+pub struct FrozenTarget {
+    pub enabled: bool,
     /// centidegrees celcius
     pub temp: u16,
 }
@@ -41,11 +42,25 @@ pub struct TemperatureUpdate {
     pub count: u8,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct GetTemperature {
+    /// centidegrees celcius
+    pub left_temp: u16,
+    /// centidegrees celcius
+    pub right_temp: u16,
+    /// centidegrees celcius
+    pub unknown_temp: u16,
+    /// centidegrees celcius
+    pub heatsink_temp: u16,
+}
+
 impl Packet for FrozenPacket {
     fn parse(buf: BytesMut) -> Result<Self, PacketError> {
+        // responses are cmd + 0x80
         match buf[0] {
             0x07 => packet::parse_message("Frozen/Message", buf).map(FrozenPacket::Message),
-            0x41 => Self::parse_state_update(buf),
+            0x41 => Self::parse_temperature_update(buf),
+            0xC1 => Self::parse_get_temperature(buf),
             0x53 => Self::parse_heartbeat(buf),
             0x81 => packet::parse_pong("Frozen/Pong", buf).map(FrozenPacket::Pong),
             0x82 => packet::parse_hardware_info("Frozen/HardwareInfo", buf)
@@ -90,12 +105,15 @@ impl FrozenPacket {
 
         Ok(FrozenPacket::TargetUpdate((
             side,
-            TargetUpdate { state, temp },
+            FrozenTarget {
+                enabled: state,
+                temp,
+            },
         )))
     }
 
-    fn parse_state_update(buf: BytesMut) -> Result<Self, PacketError> {
-        validate_packet_size("Frozen/StateUpdate", &buf, 9)?;
+    fn parse_temperature_update(buf: BytesMut) -> Result<Self, PacketError> {
+        validate_packet_size("Frozen/TemperatureUpdate", &buf, 9)?;
 
         Ok(FrozenPacket::TemperatureUpdate(TemperatureUpdate {
             left_temp: u16::from_be_bytes([buf[1], buf[2]]),
@@ -103,6 +121,30 @@ impl FrozenPacket {
             heatsink_temp: u16::from_be_bytes([buf[5], buf[6]]),
             error: buf[7],
             count: buf[8],
+        }))
+    }
+
+    /// C1 00 01 0A 15 02 0A 0F 03 07 F5 04 09 3A
+    /// 0  1  2  3  4  5  6  7  8  9  10 11 12 13
+    fn parse_get_temperature(buf: BytesMut) -> Result<Self, PacketError> {
+        validate_packet_size("Frozen/GetTemperature", &buf, 27)?;
+
+        let indices_valid =
+            buf[1] == 0 && buf[2] == 1 && buf[5] == 2 && buf[8] == 3 && buf[11] == 4;
+
+        if !indices_valid {
+            return Err(invalid_structure(
+                "Frozen/GetTemperature",
+                "invalid indices".to_string(),
+                buf,
+            ));
+        }
+
+        Ok(Self::GetTemperature(GetTemperature {
+            left_temp: u16::from_be_bytes([buf[3], buf[4]]),
+            right_temp: u16::from_be_bytes([buf[6], buf[7]]),
+            unknown_temp: u16::from_be_bytes([buf[9], buf[10]]),
+            heatsink_temp: u16::from_be_bytes([buf[12], buf[13]]),
         }))
     }
 }
@@ -176,8 +218,8 @@ mod tests {
             FrozenPacket::parse(BytesMut::from(&data[..])),
             Ok(FrozenPacket::TargetUpdate((
                 BedSide::Left,
-                TargetUpdate {
-                    state: true,
+                FrozenTarget {
+                    enabled: true,
                     temp: 3000
                 }
             )))
@@ -188,8 +230,8 @@ mod tests {
             FrozenPacket::parse(BytesMut::from(&data[..])),
             Ok(FrozenPacket::TargetUpdate((
                 BedSide::Right,
-                TargetUpdate {
-                    state: false,
+                FrozenTarget {
+                    enabled: false,
                     temp: 2752
                 }
             )))

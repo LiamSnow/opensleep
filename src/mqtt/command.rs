@@ -1,6 +1,4 @@
-use crate::config::{
-    Config, HeatConfig, LedConfig, LedPattern, Profile, VibrationConfig, VibrationPattern,
-};
+use crate::config::{Config, SideConfig, VibrationConfig, VibrationPattern};
 use crate::mqtt::MqttError;
 use jiff::civil::Time;
 use jiff::tz::TimeZone;
@@ -36,20 +34,11 @@ pub async fn handle_command(
             let time = parse_time(payload.trim())?;
             update_config(config_tx, config_rx, |cfg| cfg.prime = time)
         }
-        "set_led_config" => {
-            let (idle_pattern, active_pattern) = parse_led_params(payload.trim())?;
-            update_config(config_tx, config_rx, |cfg| {
-                cfg.led = LedConfig {
-                    idle: idle_pattern,
-                    active: active_pattern,
-                }
-            })
-        }
         "set_temp_profile" => {
             update_profile_field(&payload, config_tx, config_rx, |temps_str, profile| {
-                let temps: Vec<i32> = temps_str
+                let temps: Vec<f32> = temps_str
                     .split(',')
-                    .map(|s| s.trim().parse::<i32>())
+                    .map(|s| s.trim().parse())
                     .collect::<Result<Vec<_>, _>>()
                     .map_err(|_| {
                         MqttError::InvalidCommand("Invalid temperature values".to_string())
@@ -60,20 +49,7 @@ pub async fn handle_command(
         }
         "set_vibration_config" => {
             update_profile_field(&payload, config_tx, config_rx, |config_str, profile| {
-                let (pattern, intensity, duration, offset) = parse_vibration_params(config_str)?;
-                profile.vibration = VibrationConfig {
-                    pattern,
-                    intensity,
-                    duration,
-                    offset,
-                };
-                Ok(())
-            })
-        }
-        "set_heat_config" => {
-            update_profile_field(&payload, config_tx, config_rx, |config_str, profile| {
-                let (temp, offset) = parse_heat_params(config_str)?;
-                profile.heat = HeatConfig { temp, offset };
+                profile.vibration = parse_vibration_params(config_str)?;
                 Ok(())
             })
         }
@@ -120,13 +96,13 @@ fn update_profile_field<F>(
     field_updater: F,
 ) -> Result<(), MqttError>
 where
-    F: FnOnce(&str, &mut Profile) -> Result<(), MqttError>,
+    F: FnOnce(&str, &mut SideConfig) -> Result<(), MqttError>,
 {
     let (side, value_str) = parse_side_prefix(payload.trim());
 
     let mut cfg = config_rx.borrow().clone();
     let profile = cfg
-        .profile
+        .side_config
         .get_profile_mut(side)
         .ok_or(MqttError::ProfileSide)?;
 
@@ -185,7 +161,11 @@ fn parse_side_prefix(payload: &str) -> (Option<&str>, &str) {
     (None, payload)
 }
 
-fn parse_vibration_params(s: &str) -> Result<(VibrationPattern, u8, u32, u32), MqttError> {
+fn parse_vibration_params(s: &str) -> Result<Option<VibrationConfig>, MqttError> {
+    if s == "off" || s == "disabled" {
+        return Ok(None);
+    }
+
     let parts: Vec<&str> = s.split(',').collect();
     if parts.len() != 4 {
         return Err(MqttError::InvalidCommand(
@@ -193,15 +173,15 @@ fn parse_vibration_params(s: &str) -> Result<(VibrationPattern, u8, u32, u32), M
         ));
     }
 
-    Ok((
-        parts[0]
+    Ok(Some(VibrationConfig {
+        pattern: parts[0]
             .trim()
             .parse::<VibrationPattern>()
             .map_err(|e| MqttError::InvalidCommand(format!("Invalid vibration pattern: {e}")))?,
-        parse_or_invalid::<u8>(parts[1], "intensity")?,
-        parse_or_invalid::<u32>(parts[2], "duration")?,
-        parse_or_invalid::<u32>(parts[3], "offset")?,
-    ))
+        intensity: parse_or_invalid::<u8>(parts[1], "intensity")?,
+        duration: parse_or_invalid::<u32>(parts[2], "duration")?,
+        offset: parse_or_invalid::<u32>(parts[3], "offset")?,
+    }))
 }
 
 fn parse_heat_params(s: &str) -> Result<(u8, u32), MqttError> {
@@ -215,25 +195,5 @@ fn parse_heat_params(s: &str) -> Result<(u8, u32), MqttError> {
     Ok((
         parse_or_invalid::<u8>(parts[0], "temperature")?,
         parse_or_invalid::<u32>(parts[1], "offset")?,
-    ))
-}
-
-fn parse_led_params(s: &str) -> Result<(LedPattern, LedPattern), MqttError> {
-    let parts: Vec<&str> = s.split(',').collect();
-    if parts.len() != 2 {
-        return Err(MqttError::InvalidCommand(
-            "Expected format: idle:pattern,active:pattern".to_string(),
-        ));
-    }
-
-    Ok((
-        parts[0]
-            .trim_start_matches("idle:")
-            .parse::<LedPattern>()
-            .map_err(|e| MqttError::InvalidCommand(format!("Invalid LED pattern: {e}")))?,
-        parts[1]
-            .trim_start_matches("active:")
-            .parse::<LedPattern>()
-            .map_err(|e| MqttError::InvalidCommand(format!("Invalid LED pattern: {e}")))?,
     ))
 }

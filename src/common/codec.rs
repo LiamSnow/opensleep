@@ -97,6 +97,17 @@ impl<P: Packet> Decoder for PacketCodec<P> {
     }
 }
 
+pub fn command(mut payload: Vec<u8>) -> Vec<u8> {
+    let mut res = Vec::with_capacity(payload.len() + 4);
+    let checksum = checksum::compute(&payload);
+    res.push(START);
+    res.push(payload.len() as u8);
+    res.append(&mut payload);
+    res.push((checksum >> 8) as u8);
+    res.push(checksum as u8);
+    res
+}
+
 pub trait CommandTrait {
     fn to_bytes(&self) -> Vec<u8>;
 }

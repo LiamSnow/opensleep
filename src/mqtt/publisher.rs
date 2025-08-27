@@ -1,8 +1,8 @@
 use crate::common::serial::DeviceMode;
-use crate::config::{Config, ProfileType};
+use crate::config::{Config, SideConfigType};
 use crate::frozen::state::FrozenUpdate;
 use crate::mqtt::MqttError;
-use crate::presence::PresenceState;
+use crate::sensor::presence::PresenceState;
 use crate::sensor::state::SensorUpdate;
 use rumqttc::{AsyncClient, QoS};
 use std::fmt::Display;
@@ -87,7 +87,7 @@ impl StatePublisher {
             }
             FrozenUpdate::LeftTarget(target) => {
                 target
-                    .state
+                    .enabled
                     .publish(
                         &self.client,
                         &format!("{base}/target/left/enabled"),
@@ -105,7 +105,7 @@ impl StatePublisher {
             }
             FrozenUpdate::RightTarget(target) => {
                 target
-                    .state
+                    .enabled
                     .publish(
                         &self.client,
                         &format!("{base}/target/right/enabled"),
@@ -193,7 +193,7 @@ impl StatePublisher {
                         QoS::AtMostOnce,
                     )
                     .await?;
-                temp.mcu
+                temp.microcontroller
                     .publish(
                         &self.client,
                         &format!("{base}/temperature/mcu"),
@@ -260,16 +260,10 @@ impl StatePublisher {
             )
             .await?;
 
-        config
-            .led
-            .idle
-            .to_string()
+        format!("{:#?}", config.led.idle)
             .publish(&self.client, &format!("{base}/led/idle"), QoS::AtLeastOnce)
             .await?;
-        config
-            .led
-            .active
-            .to_string()
+        format!("{:#?}", config.led.active)
             .publish(
                 &self.client,
                 &format!("{base}/led/active"),
@@ -297,8 +291,8 @@ impl StatePublisher {
             .publish(&self.client, &format!("{base}/mqtt/user"), QoS::AtLeastOnce)
             .await?;
 
-        match &config.profile {
-            ProfileType::Solo(profile) => {
+        match &config.side_config {
+            SideConfigType::Solo(profile) => {
                 "solo"
                     .publish(
                         &self.client,
@@ -309,7 +303,7 @@ impl StatePublisher {
                 self.publish_profile(profile, &format!("{base}/profile/solo"))
                     .await?;
             }
-            ProfileType::Couples { left, right } => {
+            SideConfigType::Couples { left, right } => {
                 "couples"
                     .publish(
                         &self.client,
@@ -355,7 +349,7 @@ impl StatePublisher {
 
     async fn publish_profile(
         &self,
-        profile: &crate::config::Profile,
+        profile: &crate::config::SideConfig,
         base: &str,
     ) -> Result<(), MqttError> {
         publish_array_csv(
@@ -382,10 +376,6 @@ impl StatePublisher {
 
         serde_json::to_string(&profile.vibration)?
             .publish(&self.client, &format!("{base}/vibration"), QoS::AtLeastOnce)
-            .await?;
-
-        serde_json::to_string(&profile.heat)?
-            .publish(&self.client, &format!("{base}/heat"), QoS::AtLeastOnce)
             .await?;
 
         Ok(())

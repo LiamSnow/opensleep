@@ -2,11 +2,14 @@ use std::time::Duration;
 
 use crate::common::codec::PacketCodec;
 use crate::common::serial::{DeviceMode, SerialError, create_framed_port};
-use crate::sensor::state::{SensorState, SensorUpdate};
+use crate::config::Config;
+use crate::sensor::command::AlarmCommand;
+use crate::sensor::presence::{PresenceState, PresenseManager};
+use crate::sensor::state::{PIEZO_FREQ, PIEZO_GAIN, SensorState, SensorUpdate};
 use crate::sensor::{SensorCommand, SensorPacket};
 use futures_util::stream::{SplitSink, SplitStream};
 use futures_util::{SinkExt, StreamExt};
-use tokio::sync::broadcast;
+use tokio::sync::{mpsc, watch};
 use tokio::time::{Instant, interval, timeout};
 use tokio_serial::SerialStream;
 use tokio_util::codec::Framed;
@@ -16,8 +19,8 @@ const BOOTLOADER_BAUD: u32 = 38400;
 const FIRMWARE_BAUD: u32 = 115200;
 
 const COMMAND_INT: Duration = Duration::from_millis(50);
-const PING_INT: Duration = Duration::from_secs(5);
-const PROBE_INT: Duration = Duration::from_secs(5);
+const PING_INT: Duration = Duration::from_secs(4); // matches frankenfirmware
+const PROBE_INT: Duration = Duration::from_secs(10); // matches frankenfirmware
 const CONFIG_RES_TIME: Duration = Duration::from_millis(800);
 
 type Reader = SplitStream<Framed<SerialStream, PacketCodec<SensorPacket>>>;
@@ -35,11 +38,16 @@ struct CommandTimers {
 
 pub async fn run(
     port: &'static str,
-    mut update_tx: broadcast::Sender<SensorUpdate>,
+    mut update_tx: mpsc::Sender<SensorUpdate>,
+    config_tx: watch::Sender<Config>,
+    config_rx: watch::Receiver<Config>,
+    mut calibrate_rx: mpsc::Receiver<()>,
+    presence_tx: mpsc::Sender<PresenceState>,
 ) -> Result<(), SerialError> {
     log::info!("Initializing Sensor Subsystem...");
 
     let mut state = SensorState::default();
+    let mut presense_man = PresenseManager::new(config_tx, config_rx, presence_tx);
 
     let (mut writer, mut reader) = run_discovery(port, &mut update_tx, &mut state)
         .await
@@ -53,12 +61,17 @@ pub async fn run(
         tokio::select! {
             Some(result) = reader.next() => match result {
                 Ok(packet) => {
+                    if let SensorPacket::Capacitance(data) = &packet {
+                        presense_man.update(data);
+                    }
+
                     state.handle_packet(&mut update_tx, packet);
                 }
                 Err(e) => {
                     log::error!("Packet decode error: {e}");
                 }
             },
+
             _ = interval.tick() => {
                 if let Some(cmd) = get_next_command(&mut timers, &state) {
                     log::debug!(" -> {cmd:?}");
@@ -67,12 +80,20 @@ pub async fn run(
                     }
                 }
             }
+
+            Some(_) = calibrate_rx.recv() => presense_man.start_calibration()
         }
     }
 }
 
 fn get_next_command(timers: &mut CommandTimers, state: &SensorState) -> Option<SensorCommand> {
     let now = Instant::now();
+    // TODO
+    // if state.vibration_enabled
+    //     && let Ok(acmd) = alarm_rx.try_recv()
+    // {
+    //     Some(SensorCommand::SetAlarm(acmd))
+    // } else
     if now.duration_since(timers.last_ping) > PING_INT {
         timers.last_ping = now;
         Some(SensorCommand::Ping)
@@ -89,13 +110,13 @@ fn get_next_command(timers: &mut CommandTimers, state: &SensorState) -> Option<S
         Some(SensorCommand::EnableVibration)
     } else if now.duration_since(timers.last_gain) > CONFIG_RES_TIME && !state.piezo_gain_ok() {
         timers.last_gain = now;
-        Some(SensorCommand::SetPiezoGain400400)
+        Some(SensorCommand::SetPiezoGain(PIEZO_GAIN, PIEZO_GAIN))
     } else if now.duration_since(timers.last_freq) > CONFIG_RES_TIME
         && state.piezo_enabled
         && !state.piezo_freq_ok()
     {
         timers.last_freq = now;
-        Some(SensorCommand::SetPiezoFreq1KHz)
+        Some(SensorCommand::SetPiezoFreq(PIEZO_FREQ))
     } else if now.duration_since(timers.last_piezo) > CONFIG_RES_TIME && !state.piezo_enabled {
         timers.last_piezo = now;
         Some(SensorCommand::EnablePiezo)
@@ -106,7 +127,7 @@ fn get_next_command(timers: &mut CommandTimers, state: &SensorState) -> Option<S
 
 async fn run_discovery(
     port: &'static str,
-    update_tx: &mut broadcast::Sender<SensorUpdate>,
+    update_tx: &mut mpsc::Sender<SensorUpdate>,
     state: &mut SensorState,
 ) -> Result<(Writer, Reader), SerialError> {
     // try bootloader first
@@ -131,7 +152,7 @@ async fn run_discovery(
 
 async fn ping_device(
     port: &'static str,
-    update_tx: &mut broadcast::Sender<SensorUpdate>,
+    update_tx: &mut mpsc::Sender<SensorUpdate>,
     state: &mut SensorState,
     mode: DeviceMode,
 ) -> Result<(Writer, Reader), SerialError> {
@@ -163,7 +184,7 @@ async fn ping_device(
 
 async fn wait_for_mode(
     reader: &mut Reader,
-    update_tx: &mut broadcast::Sender<SensorUpdate>,
+    update_tx: &mut mpsc::Sender<SensorUpdate>,
     state: &mut SensorState,
     target_mode: DeviceMode,
 ) -> Result<(), SerialError> {

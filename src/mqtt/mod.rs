@@ -4,10 +4,9 @@ mod publisher;
 
 pub use model::MqttError;
 use publisher::StatePublisher;
-use tokio::sync::broadcast;
 
 use crate::frozen::state::FrozenUpdate;
-use crate::presence::PresenceState;
+use crate::sensor::presence::PresenceState;
 use crate::{config::Config, sensor::state::SensorUpdate};
 use rumqttc::{AsyncClient, Event, EventLoop, MqttOptions, Packet, QoS};
 use std::time::Duration;
@@ -19,7 +18,7 @@ use tokio::{
 pub fn spawn(
     config_tx: watch::Sender<Config>,
     config_rx: watch::Receiver<Config>,
-    sensor_update_rx: broadcast::Receiver<SensorUpdate>,
+    sensor_update_rx: mpsc::Receiver<SensorUpdate>,
     frozen_update_rx: mpsc::Receiver<FrozenUpdate>,
     presense_state_rx: mpsc::Receiver<PresenceState>,
     calibrate_tx: mpsc::Sender<()>,
@@ -65,7 +64,7 @@ pub fn spawn(
 async fn publish_task(
     client: AsyncClient,
     mut config_rx: watch::Receiver<Config>,
-    mut sensor_update_rx: broadcast::Receiver<SensorUpdate>,
+    mut sensor_update_rx: mpsc::Receiver<SensorUpdate>,
     mut frozen_update_rx: mpsc::Receiver<FrozenUpdate>,
     mut presense_state_rx: mpsc::Receiver<PresenceState>,
 ) {
@@ -97,7 +96,7 @@ async fn publish_task(
                     log::error!("Error publishing config: {e}");
                 }
             }
-            Ok(sensor_update) = sensor_update_rx.recv() => {
+            Some(sensor_update) = sensor_update_rx.recv() => {
                 if let Err(e) = publisher.publish_sensor_update(sensor_update).await {
                     log::error!("Error publishing sensor update: {e}");
                 }

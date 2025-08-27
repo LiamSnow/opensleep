@@ -19,19 +19,16 @@ pub enum SensorPacket {
     VibrationEnabled(u8, u8),
     /// unknown value, always 4
     GetFirmware(u8),
-    /// still figuring out exactly the meaning of this command
-    /// occurs after enabling piezo sensor
-    /// can be either A8 or A1 or both
-    /// also called "sampling started"
-    ///  - left value is cmd
-    ///  - right value is unknown, always 0
-    PiezoEnabled(u8, u8),
+    /// unknown value, always 0
+    PiezoFreqSet(u8),
+    /// unknown value, always 0
+    PiezoEnabled(u8),
     /// occurs in BL -> FW transition
     Init(u16),
     Capacitance(CapacitanceData),
     Piezo(PiezoData),
     Temperature(TemperatureData),
-    /// unknown value
+    /// unknown value, usually 172
     AlarmSet(u8),
 }
 
@@ -47,14 +44,17 @@ pub struct TemperatureData {
     /// ordered LTR
     /// centidegrees celcius
     pub bed: [u16; 8],
+    /// centidegrees celcius
     pub ambient: u16,
+    /// centidegrees celcius
     pub humidity: u16,
-    pub mcu: u16,
+    /// centidegrees celcius
+    pub microcontroller: u16,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct PiezoData {
-    pub freq: u16,
+    pub freq: u32,
     pub sequence: u32,
     pub gain: (u16, u16),
     pub left_samples: Vec<u16>,
@@ -62,6 +62,7 @@ pub struct PiezoData {
 }
 
 impl Packet for SensorPacket {
+    // responses are cmd + 0x80
     fn parse(buf: BytesMut) -> Result<Self, PacketError> {
         match buf[0] {
             0x07 => packet::parse_message("Sensor/Message", buf).map(SensorPacket::Message),
@@ -74,8 +75,8 @@ impl Packet for SensorPacket {
             0x84 => Self::parse_get_firmware(buf),
             0x90 => packet::parse_jumping_to_firmware("Sensor/JumpingToFirmware", buf)
                 .map(SensorPacket::JumpingToFirmware),
-            0xA1 => Self::parse_sampling_started(buf),
-            0xA8 => Self::parse_sampling_started(buf),
+            0xA1 => Self::parse_piezo_freq_set(buf),
+            0xA8 => Self::parse_piezo_enabled(buf),
             0xAB => Self::parse_piezo_gain_set(buf),
             0xAC => Self::parse_alarm_set(buf),
             0xAE => Self::parse_vibration_enabled(buf),
@@ -107,9 +108,14 @@ impl SensorPacket {
         ))
     }
 
-    fn parse_sampling_started(buf: BytesMut) -> Result<Self, PacketError> {
+    fn parse_piezo_freq_set(buf: BytesMut) -> Result<Self, PacketError> {
+        validate_packet_size("Sensor/PiezoFreqSet", &buf, 2)?;
+        Ok(SensorPacket::PiezoFreqSet(buf[1]))
+    }
+
+    fn parse_piezo_enabled(buf: BytesMut) -> Result<Self, PacketError> {
         validate_packet_size("Sensor/PiezoEnabled", &buf, 2)?;
-        Ok(SensorPacket::PiezoEnabled(buf[0], buf[1]))
+        Ok(SensorPacket::PiezoEnabled(buf[1]))
     }
 
     fn parse_vibration_enabled(buf: BytesMut) -> Result<Self, PacketError> {
@@ -144,7 +150,7 @@ impl SensorPacket {
 
         if !indices_valid {
             return Err(invalid_structure(
-                "Capacitance",
+                "Sensor/Capacitance",
                 "invalid indices".to_string(),
                 buf,
             ));
@@ -182,7 +188,7 @@ impl SensorPacket {
 
         if !indices_valid {
             return Err(invalid_structure(
-                "Temperature",
+                "Sensor/Temperature",
                 "invalid indices or spacer".to_string(),
                 buf,
             ));
@@ -201,7 +207,7 @@ impl SensorPacket {
             ],
             ambient: u16::from_be_bytes([buf[27], buf[28]]),
             humidity: u16::from_be_bytes([buf[30], buf[31]]),
-            mcu: u16::from_be_bytes([buf[33], buf[34]]),
+            microcontroller: u16::from_be_bytes([buf[33], buf[34]]),
         }))
     }
 
@@ -214,11 +220,7 @@ impl SensorPacket {
             log::warn!("Unexpected Piezo header: {:02X}", buf[1]);
         }
 
-        if buf[2] != 0 || buf[3] != 0 {
-            log::warn!("Unexpected Piezo reserved: {:02X} {:02X}", buf[2], buf[3]);
-        }
-
-        let freq = u16::from_be_bytes([buf[4], buf[5]]);
+        let freq = u32::from_be_bytes([buf[2], buf[3], buf[4], buf[5]]);
         let sequence = u32::from_be_bytes([buf[6], buf[7], buf[8], buf[9]]);
         let gain = (
             u16::from_be_bytes([buf[10], buf[11]]),
@@ -302,16 +304,6 @@ mod tests {
             Ok(SensorPacket::GetFirmware(4))
         );
         assert!(SensorPacket::parse(BytesMut::from(&[0x84][..])).is_err());
-    }
-
-    #[test]
-    fn test_piezo_enabled() {
-        assert_eq!(
-            SensorPacket::parse(BytesMut::from(&[0xA8, 0][..])),
-            Ok(SensorPacket::PiezoEnabled(0xA8, 0))
-        );
-
-        assert!(SensorPacket::parse(BytesMut::from(&[0xA8][..])).is_err());
     }
 
     #[test]
@@ -403,7 +395,7 @@ mod tests {
                 );
                 assert_eq!(temp.ambient, 0x1112);
                 assert_eq!(temp.humidity, 0x1314);
-                assert_eq!(temp.mcu, 0x1516);
+                assert_eq!(temp.microcontroller, 0x1516);
             }
             _ => panic!("Wrong packet type"),
         }

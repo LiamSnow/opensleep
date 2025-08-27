@@ -16,12 +16,10 @@ pub struct PresenceState {
 }
 
 pub struct PresenseManager {
-    sensor_update_rx: broadcast::Receiver<SensorUpdate>,
     config_tx: watch::Sender<Config>,
     config_rx: watch::Receiver<Config>,
     config: Option<PresenceConfig>,
     presence_tx: mpsc::Sender<PresenceState>,
-    calibrate_rx: mpsc::Receiver<()>,
     calibration_end: Option<Instant>,
     calibration_samples: Vec<[u16; 6]>,
     debounce: [u8; 6],
@@ -29,54 +27,38 @@ pub struct PresenseManager {
 }
 
 impl PresenseManager {
-    pub async fn run(
+    pub fn new(
         config_tx: watch::Sender<Config>,
         config_rx: watch::Receiver<Config>,
-        sensor_update_rx: broadcast::Receiver<SensorUpdate>,
-        calibrate_rx: mpsc::Receiver<()>,
         presence_tx: mpsc::Sender<PresenceState>,
-    ) {
-        log::info!("Initializing Presence Detector...");
-
-        let mut me = PresenseManager {
-            sensor_update_rx,
+    ) -> Self {
+        PresenseManager {
             config: {
                 let b = config_rx.borrow();
+                if b.presence.is_none() {
+                    log::warn!(
+                        "No presence config found. Please calibrate using 'opensleep/command/calibrate' endpoint."
+                    );
+                }
                 b.presence.as_ref().cloned()
             },
             config_tx,
             config_rx,
             presence_tx,
-            calibrate_rx,
             calibration_end: None,
             calibration_samples: Vec::new(),
             debounce: [0u8; 6],
             last_state: PresenceState::default(),
-        };
-
-        if me.config.is_none() {
-            log::warn!(
-                "No presence config found. Please calibrate using 'opensleep/command/calibrate' endpoint."
-            );
-        }
-
-        loop {
-            tokio::select! {
-                Ok(update) = me.sensor_update_rx.recv() => me.handle_sensor_update(update),
-                Some(_) = me.calibrate_rx.recv() => me.start_calibration(),
-            }
         }
     }
 
-    fn handle_sensor_update(&mut self, update: SensorUpdate) {
-        if let SensorUpdate::Capacitance(data) = update {
-            if self.config.is_some() {
-                self.update_presence(&data);
-            }
+    pub fn update(&mut self, data: &CapacitanceData) {
+        if self.config.is_some() {
+            self.update_presence(data);
+        }
 
-            if self.calibration_end.is_some() {
-                self.update_calibration(data);
-            }
+        if self.calibration_end.is_some() {
+            self.update_calibration(data);
         }
     }
 
@@ -112,13 +94,13 @@ impl PresenseManager {
         }
     }
 
-    fn start_calibration(&mut self) {
+    pub fn start_calibration(&mut self) {
         log::info!("Running calibration for {}", CALIBRATION_DURATION.as_secs());
         self.calibration_end = Some(Instant::now() + CALIBRATION_DURATION);
         self.calibration_samples = vec![];
     }
 
-    fn update_calibration(&mut self, data: CapacitanceData) {
+    fn update_calibration(&mut self, data: &CapacitanceData) {
         self.calibration_samples.push(data.values);
 
         if Instant::now() > self.calibration_end.unwrap() {

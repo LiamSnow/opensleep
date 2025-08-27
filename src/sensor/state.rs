@@ -1,4 +1,4 @@
-use tokio::sync::broadcast;
+use tokio::sync::mpsc;
 
 use crate::{
     common::{packet::HardwareInfo, serial::DeviceMode},
@@ -13,7 +13,7 @@ pub enum SensorUpdate {
     Capacitance(CapacitanceData),
     Temperature(TemperatureData),
     PiezoGain(u16, u16),
-    PiezoFreq(u16),
+    PiezoFreq(u32),
     PiezoEnabled(bool),
 }
 
@@ -23,20 +23,20 @@ pub struct SensorState {
     pub hardware_info: Option<HardwareInfo>,
     pub vibration_enabled: bool,
     pub piezo_gain: Option<(u16, u16)>,
-    pub piezo_freq: Option<u16>,
+    pub piezo_freq: Option<u32>,
     pub piezo_enabled: bool,
 }
 
-const PIEZO_GAIN: i16 = 400;
+pub const PIEZO_GAIN: u16 = 400;
 const PIEZO_TOLERANCE: i16 = 6;
-const PIEZO_FREQ: u16 = 1000;
+pub const PIEZO_FREQ: u32 = 1000;
 
 impl SensorState {
     pub fn piezo_gain_ok(&self) -> bool {
         match self.piezo_gain {
             Some((l, r)) => {
-                (PIEZO_GAIN - l as i16).abs() < PIEZO_TOLERANCE
-                    && (PIEZO_GAIN - r as i16).abs() < PIEZO_TOLERANCE
+                (PIEZO_GAIN as i16 - l as i16).abs() < PIEZO_TOLERANCE
+                    && (PIEZO_GAIN as i16 - r as i16).abs() < PIEZO_TOLERANCE
             }
             None => false,
         }
@@ -48,7 +48,7 @@ impl SensorState {
 
     pub fn set_device_mode(
         &mut self,
-        update_tx: &mut broadcast::Sender<SensorUpdate>,
+        update_tx: &mut mpsc::Sender<SensorUpdate>,
         mode: DeviceMode,
     ) {
         let prev = self.device_mode;
@@ -62,7 +62,7 @@ impl SensorState {
 
     pub fn handle_packet(
         &mut self,
-        update_tx: &mut broadcast::Sender<SensorUpdate>,
+        update_tx: &mut mpsc::Sender<SensorUpdate>,
         packet: SensorPacket,
     ) {
         match packet {
@@ -86,8 +86,8 @@ impl SensorState {
                 send_update(update_tx, SensorUpdate::PiezoGain(l, r));
                 self.piezo_gain = Some((l, r));
             }
-            SensorPacket::PiezoEnabled(cmd, val) => {
-                log::info!("Piezo Enabled {cmd:02X},{val:02X}");
+            SensorPacket::PiezoEnabled(val) => {
+                log::info!("Piezo Enabled {val:02X}");
                 send_update(update_tx, SensorUpdate::PiezoEnabled(true));
                 self.piezo_enabled = true;
             }
@@ -133,8 +133,8 @@ impl SensorState {
     }
 }
 
-fn send_update(update_tx: &mut broadcast::Sender<SensorUpdate>, update: SensorUpdate) {
-    if let Err(e) = update_tx.send(update) {
+fn send_update(update_tx: &mut mpsc::Sender<SensorUpdate>, update: SensorUpdate) {
+    if let Err(e) = update_tx.try_send(update) {
         log::error!("Failed to send to state_tx: {e}");
     }
 }
