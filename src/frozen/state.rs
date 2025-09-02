@@ -1,4 +1,4 @@
-use tokio::sync::mpsc;
+use rumqttc::AsyncClient;
 
 use crate::{
     common::{
@@ -6,16 +6,8 @@ use crate::{
         serial::DeviceMode,
     },
     frozen::packet::{FrozenPacket, FrozenTarget, TemperatureUpdate},
+    mqtt::{publish_guaranteed, publish_high_freq},
 };
-
-#[derive(Clone, Debug)]
-pub enum FrozenUpdate {
-    DeviceMode(DeviceMode),
-    HardwareInfo(HardwareInfo),
-    Temperature(TemperatureUpdate),
-    LeftTarget(FrozenTarget),
-    RightTarget(FrozenTarget),
-}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FrozenState {
@@ -27,22 +19,26 @@ pub struct FrozenState {
     pub is_priming: bool,
 }
 
+const TOPIC_MODE: &str = "opensleep/frozen/mode";
+const TOPIC_HWINFO: &str = "opensleep/frozen/hwinfo";
+const TOPIC_LEFT_TEMP: &str = "opensleep/frozen/left_temp";
+const TOPIC_RIGHT_TEMP: &str = "opensleep/frozen/right_temp";
+const TOPIC_HEATSINK_TEMP: &str = "opensleep/frozen/heatsink_temp";
+const TOPIC_LEFT_TARGET_TEMP: &str = "opensleep/frozen/left_target_temp";
+const TOPIC_RIGHT_TARGET_TEMP: &str = "opensleep/frozen/right_target_temp";
+
 impl FrozenState {
     pub fn is_awake(&self) -> bool {
         self.device_mode == DeviceMode::Firmware
     }
 
-    pub fn set_device_mode(
-        &mut self,
-        update_tx: &mut mpsc::Sender<FrozenUpdate>,
-        mode: DeviceMode,
-    ) {
+    pub fn set_device_mode(&mut self, client: &mut AsyncClient, mode: DeviceMode) {
         let prev = self.device_mode;
         self.device_mode = mode;
 
         if prev != mode {
             log::info!("Device mode: {prev:?} -> {mode:?}");
-            send_update(update_tx, FrozenUpdate::DeviceMode(mode));
+            publish_guaranteed(client, TOPIC_MODE, false, mode.to_string());
         }
     }
 
@@ -50,14 +46,10 @@ impl FrozenState {
         self.left_target.is_some() || self.right_target.is_some()
     }
 
-    pub fn handle_packet(
-        &mut self,
-        update_tx: &mut mpsc::Sender<FrozenUpdate>,
-        packet: FrozenPacket,
-    ) {
+    pub fn handle_packet(&mut self, client: &mut AsyncClient, packet: FrozenPacket) {
         match packet {
             FrozenPacket::Pong(in_firmware) => {
-                self.set_device_mode(update_tx, DeviceMode::from_pong(in_firmware));
+                self.set_device_mode(client, DeviceMode::from_pong(in_firmware));
             }
             FrozenPacket::TemperatureUpdate(u) => {
                 log::debug!(
@@ -67,7 +59,11 @@ impl FrozenState {
                     u.heatsink_temp,
                     u.error
                 );
-                send_update(update_tx, FrozenUpdate::Temperature(u.clone()));
+
+                publish_high_freq(client, TOPIC_LEFT_TEMP, u.left_temp.to_string());
+                publish_high_freq(client, TOPIC_RIGHT_TEMP, u.right_temp.to_string());
+                publish_high_freq(client, TOPIC_HEATSINK_TEMP, u.heatsink_temp.to_string());
+
                 self.temp = Some(u);
             }
             FrozenPacket::TargetUpdate((side, u)) => {
@@ -77,25 +73,30 @@ impl FrozenState {
                     u.enabled,
                     u.temp
                 );
-                match side {
+                let payload = match u.enabled {
+                    true => &u.temp.to_string(),
+                    false => "disabled",
+                };
+                let topic = match side {
                     BedSide::Left => {
-                        send_update(update_tx, FrozenUpdate::LeftTarget(u.clone()));
                         self.left_target = Some(u);
+                        TOPIC_LEFT_TARGET_TEMP
                     }
                     BedSide::Right => {
-                        send_update(update_tx, FrozenUpdate::RightTarget(u.clone()));
                         self.right_target = Some(u);
+                        TOPIC_RIGHT_TARGET_TEMP
                     }
-                }
+                };
+                publish_high_freq(client, topic, payload);
             }
             FrozenPacket::HardwareInfo(info) => {
                 log::info!("Hardware info: {info}");
-                send_update(update_tx, FrozenUpdate::HardwareInfo(info.clone()));
+                publish_guaranteed(client, TOPIC_HWINFO, true, info.to_string());
                 self.hardware_info = Some(info);
             }
             FrozenPacket::JumpingToFirmware(code) => {
                 log::debug!("Jumping to firmware with code: 0x{code:02X}");
-                self.set_device_mode(update_tx, DeviceMode::Firmware);
+                self.set_device_mode(client, DeviceMode::Firmware);
             }
             FrozenPacket::Message(msg) => {
                 if msg == "FW: water empty -> full" {
@@ -134,11 +135,5 @@ impl FrozenState {
             }
             _ => {}
         }
-    }
-}
-
-fn send_update(update_tx: &mut mpsc::Sender<FrozenUpdate>, update: FrozenUpdate) {
-    if let Err(e) = update_tx.try_send(update) {
-        log::error!("Failed to send to state_tx: {e}");
     }
 }

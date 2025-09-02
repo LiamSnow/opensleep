@@ -53,13 +53,16 @@ impl OperatingMode {
 #[repr(u8)]
 pub enum CurrentBand {
     /// 0mA\~10mA, Imax=10mA
+    #[allow(dead_code)]
     One = 0b00,
     /// 0mA\~20mA, Imax=20mA
+    #[allow(dead_code)]
     Two = 0b01,
     /// 0mA\~30mA, Imax=30mA
     #[default]
     Three = 0b10,
     /// 0mA\~40mA, Imax=40mA
+    #[allow(dead_code)]
     Four = 0b11,
 }
 
@@ -69,16 +72,20 @@ pub enum ColorRepeat {
     #[default]
     Endless = 0b00,
     Once = 0b01,
+    #[allow(dead_code)]
     Twice = 0b10,
+    #[allow(dead_code)]
     Thrice = 0b11,
 }
 
 #[derive(Clone)]
 pub enum PatternNext {
+    #[allow(dead_code)]
     Stop,
     /// goto next pattern
     Next,
     /// goto previous pattern, NOT valid for P1
+    #[allow(dead_code)]
     Prev,
 }
 
@@ -89,6 +96,7 @@ pub enum Gamma {
     Gamma2_4 = 0b00,
     /// gamma = 3.5
     Gamma3_5 = 0b01,
+    #[allow(dead_code)]
     Linearity = 0b10,
 }
 

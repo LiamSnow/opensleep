@@ -1,22 +1,16 @@
-use crate::common::codec::PacketCodec;
-use crate::common::packet::BedSide;
-use crate::common::serial::SerialError;
-use crate::common::serial::create_framed_port;
-use crate::config::Config;
-use crate::config::LEDConfig;
-use crate::config::SideConfigType;
-use crate::frozen::packet::FrozenTarget;
-use crate::frozen::state::{FrozenState, FrozenUpdate};
-use crate::frozen::{FrozenCommand, FrozenPacket};
+use crate::common::{
+    codec::PacketCodec,
+    packet::BedSide,
+    serial::{SerialError, create_framed_port},
+};
+use crate::config::{Config, LEDConfig, SidesConfig};
+use crate::frozen::{FrozenCommand, FrozenPacket, packet::FrozenTarget, state::FrozenState};
 use crate::led::IS31FL3194Controller;
-use futures_util::stream::SplitSink;
-use futures_util::{SinkExt, StreamExt};
-use jiff::civil::Time;
-use jiff::tz::TimeZone;
+use futures_util::{SinkExt, StreamExt, stream::SplitSink};
+use jiff::{SignedDuration, Timestamp, civil::Time, tz::TimeZone};
 use linux_embedded_hal::I2cdev;
-use tokio::sync::mpsc;
+use rumqttc::AsyncClient;
 use tokio::sync::watch;
-use tokio::sync::watch::Ref;
 use tokio::time::{Duration, Instant, interval, sleep};
 use tokio_serial::SerialStream;
 use tokio_util::codec::Framed;
@@ -39,19 +33,19 @@ type Writer = SplitSink<Framed<SerialStream, PacketCodec<FrozenPacket>>, FrozenC
 
 pub async fn run(
     port: &'static str,
-    mut update_tx: mpsc::Sender<FrozenUpdate>,
     mut config_rx: watch::Receiver<Config>,
     mut led: IS31FL3194Controller<I2cdev>,
+    mut client: AsyncClient,
 ) -> Result<(), SerialError> {
     log::info!("Initializing Frozen Subsystem...");
 
     let cfg = config_rx.borrow_and_update();
     let led_config = cfg.led.clone();
     set_led(&mut led, &led_config, false);
-    let mut timezone = cfg.timezone.clone();
-    let mut away_mode = cfg.away_mode.clone();
-    let mut prime = cfg.prime.clone();
-    let mut side_config = cfg.side_config.clone();
+    let timezone = cfg.timezone.clone();
+    let mut away_mode = cfg.away_mode;
+    let mut prime = cfg.prime;
+    let mut side_config = cfg.profile.clone();
     drop(cfg);
 
     let (mut writer, mut reader) = create_framed_port::<FrozenPacket>(port, BAUD)?.split();
@@ -71,7 +65,7 @@ pub async fn run(
         tokio::select! {
             Some(result) = reader.next() => match result {
                 Ok(packet) => {
-                    state.handle_packet(&mut update_tx, packet);
+                    state.handle_packet(&mut client, packet);
 
                     if state.is_active() != was_active {
                         was_active = !was_active;
@@ -115,10 +109,9 @@ pub async fn run(
 
             Ok(_) = config_rx.changed() => {
                 let cfg = config_rx.borrow();
-                timezone = cfg.timezone.clone();
                 away_mode = cfg.away_mode;
                 prime = cfg.prime;
-                side_config = cfg.side_config.clone();
+                side_config = cfg.profile.clone();
             }
         }
     }
@@ -129,10 +122,11 @@ fn get_next_command(
     state: &FrozenState,
     timezone: &TimeZone,
     away_mode: &bool,
-    prime: &Time,
-    side_config: &SideConfigType,
+    prime_time: &Time,
+    side_config: &SidesConfig,
 ) -> Option<FrozenCommand> {
     let now = Instant::now();
+
     if state.hardware_info.is_none() && now.duration_since(timers.last_hwinfo) > HWINFO_INT {
         timers.last_hwinfo = now;
         return Some(FrozenCommand::GetHardwareInfo);
@@ -163,10 +157,17 @@ fn get_next_command(
         }
     }
 
-    // FIXME TODO PRIME
-    // if now.duration_since(timers.last_prime) > Duration::from_secs(30) {
+    let now_local = Timestamp::now().to_zoned(timezone.clone()).time();
 
-    // }
+    // TODO verify it actually started priming
+    if !away_mode
+        // prime if we are within 30 seconds of prime time AND we havn't tried to prime in the last minute
+        && now.duration_since(timers.last_prime) > Duration::from_secs(60)
+        && now_local.duration_until(*prime_time).abs() < SignedDuration::from_secs(30)
+    {
+        timers.last_prime = now;
+        return Some(FrozenCommand::Prime);
+    }
 
     None
 }

@@ -1,7 +1,7 @@
-use strum_macros::FromRepr;
+use serde::{Deserialize, Serialize};
+use strum_macros::{Display, EnumString, FromRepr};
 
 use crate::common::{
-    checksum,
     codec::{CommandTrait, command},
     packet::BedSide,
 };
@@ -32,6 +32,7 @@ pub enum SensorCommand {
     // TODO add resp packet + 0x80
     #[allow(dead_code)]
     GetHeaterOffset,
+    #[allow(dead_code)]
     Random(u8),
 }
 
@@ -69,7 +70,7 @@ impl CommandTrait for SensorCommand {
                     0x2C,
                     cmd.side as u8,
                     cmd.intensity,
-                    cmd.pattern as u8,
+                    cmd.pattern.clone() as u8,
                     (cmd.duration >> 24) as u8,
                     (cmd.duration >> 16) as u8,
                     (cmd.duration >> 8) as u8,
@@ -82,7 +83,8 @@ impl CommandTrait for SensorCommand {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy, FromRepr)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Display, EnumString, FromRepr)]
+#[strum(serialize_all = "lowercase")]
 #[repr(u8)]
 pub enum AlarmPattern {
     Single = 0x00,
@@ -156,6 +158,14 @@ mod tests {
 
     #[test]
     fn test_alarm_command() {
+        // side, intensity, pattern, duration x4
+        // 01   64   00   00 00 00 00
+        // 01   64   00   00 00 00 14
+        // 00   64   01   00 00 00 0c
+        // 00   64   01   00 00 00 00
+        // 01   32   00   00 00 00 00
+        // 01   32   00   00 00 00 14
+        // 01   64   01   00 00 00 00
         let alarm1 = AlarmCommand::new(BedSide::Right, 100, 20, AlarmPattern::Single);
         assert_eq!(
             SensorCommand::SetAlarm(alarm1).to_bytes(),

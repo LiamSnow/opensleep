@@ -9,7 +9,7 @@ mod sensor;
 use config::Config;
 use tokio::sync::{mpsc, watch};
 
-use crate::{led::IS31FL3194Controller, reset::ResetController};
+use crate::{led::IS31FL3194Controller, mqtt::MqttManager, reset::ResetController};
 
 #[tokio::main]
 pub async fn main() {
@@ -17,13 +17,12 @@ pub async fn main() {
     log::info!("Starting OpenSleep...");
 
     let config = Config::load("config.ron").unwrap();
-    log::info!("Configuration loaded successfully");
+    log::info!("`config.ron` loaded");
     let (config_tx, config_rx) = watch::channel(config.clone());
-    tokio::spawn(config::auto_save(config_rx.clone()));
 
     log::info!(
         "Using timezone: {}",
-        config.timezone.iana_name().unwrap_or("Unknown")
+        config.timezone.iana_name().unwrap_or("ERROR")
     );
 
     // reset
@@ -31,20 +30,11 @@ pub async fn main() {
     resetter.reset_subsystems().await.unwrap();
     let led = IS31FL3194Controller::new(resetter.take());
 
-    // make channels
-    let (presence_tx, presence_rx) = mpsc::channel(32);
     let (calibrate_tx, calibrate_rx) = mpsc::channel(32);
-    let (frozen_update_tx, frozen_update_rx) = mpsc::channel(32);
-    let (sensor_update_tx, sensor_update_rx) = mpsc::channel(32);
 
-    mqtt::spawn(
-        config_tx.clone(),
-        config_rx.clone(),
-        sensor_update_rx,
-        frozen_update_rx,
-        presence_rx,
-        calibrate_tx,
-    );
+    let mut mqtt_man = MqttManager::new(config_tx.clone(), config_rx.clone(), calibrate_tx);
+
+    config.publish(&mut mqtt_man.client);
 
     tokio::select! {
         _ = tokio::signal::ctrl_c() => {
@@ -53,28 +43,31 @@ pub async fn main() {
 
         res = frozen::run(
             frozen::PORT,
-            frozen_update_tx,
             config_rx.clone(),
-            led
+            led,
+            mqtt_man.client.clone()
         ) => {
             match res {
-                Ok(_) => log::warn!("Frozen task unexpectedly exited"),
+                Ok(_) => log::error!("Frozen task unexpectedly exited"),
                 Err(e) => log::error!("Frozen task failed: {e}"),
             }
         }
 
         res = sensor::run(
             sensor::PORT,
-            sensor_update_tx,
             config_tx,
             config_rx,
             calibrate_rx,
-            presence_tx
+            mqtt_man.client.clone()
         ) => {
             match res {
-                Ok(_) => log::warn!("Sensor task unexpectedly exited"),
+                Ok(_) => log::error!("Sensor task unexpectedly exited"),
                 Err(e) => log::error!("Sensor task failed: {e}"),
             }
+        }
+
+        _ = mqtt_man.run() => {
+            log::error!("MQTT manager unexpectedly exited");
         }
     }
 

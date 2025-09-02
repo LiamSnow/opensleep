@@ -1,12 +1,17 @@
 use crate::config::{Config, PresenceConfig};
+use crate::mqtt::publish_high_freq;
 use crate::sensor::packet::CapacitanceData;
-use crate::sensor::state::SensorUpdate;
+use rumqttc::AsyncClient;
 use std::time::{Duration, Instant};
-use tokio::sync::{broadcast, mpsc, watch};
+use tokio::sync::watch;
 
 const DEFAULT_THRESHOLD: u16 = 50;
 const DEFAULT_DEBOUNCE: u8 = 5;
 const CALIBRATION_DURATION: Duration = Duration::from_secs(10);
+
+const TOPIC_IN_BED: &str = "opensleep/presence/in_bed";
+const TOPIC_ON_LEFT: &str = "opensleep/presence/on_left";
+const TOPIC_ON_RIGHT: &str = "opensleep/presence/on_right";
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct PresenceState {
@@ -19,18 +24,17 @@ pub struct PresenseManager {
     config_tx: watch::Sender<Config>,
     config_rx: watch::Receiver<Config>,
     config: Option<PresenceConfig>,
-    presence_tx: mpsc::Sender<PresenceState>,
+    client: AsyncClient,
     calibration_end: Option<Instant>,
     calibration_samples: Vec<[u16; 6]>,
     debounce: [u8; 6],
-    last_state: PresenceState,
 }
 
 impl PresenseManager {
     pub fn new(
         config_tx: watch::Sender<Config>,
         config_rx: watch::Receiver<Config>,
-        presence_tx: mpsc::Sender<PresenceState>,
+        client: AsyncClient,
     ) -> Self {
         PresenseManager {
             config: {
@@ -44,11 +48,10 @@ impl PresenseManager {
             },
             config_tx,
             config_rx,
-            presence_tx,
+            client,
             calibration_end: None,
             calibration_samples: Vec::new(),
             debounce: [0u8; 6],
-            last_state: PresenceState::default(),
         }
     }
 
@@ -86,12 +89,13 @@ impl PresenseManager {
             on_right: right_present,
         };
 
-        if state != self.last_state {
-            self.last_state = state.clone();
-            if let Err(e) = self.presence_tx.try_send(state) {
-                log::error!("Failed to send presence state: {e}");
-            }
-        }
+        self.update_mqtt(&state);
+    }
+
+    fn update_mqtt(&mut self, state: &PresenceState) {
+        publish_high_freq(&mut self.client, TOPIC_IN_BED, state.in_bed.to_string());
+        publish_high_freq(&mut self.client, TOPIC_ON_LEFT, state.on_left.to_string());
+        publish_high_freq(&mut self.client, TOPIC_ON_RIGHT, state.on_right.to_string());
     }
 
     pub fn start_calibration(&mut self) {

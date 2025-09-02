@@ -1,30 +1,25 @@
-# Open Sleep
+# opensleep
 
-Free open-source firmware for Eight Sleep Pod 3.
+Open-source firmware for the Eight Sleep Pod 3.
 
 Completely replaces all Eight Sleep services (Frank, DAC/PizzaRat, Capybara).
 
-The use of open source will prevent the mobile app from working.
+WARNING: The use of opensleep will prevent the mobile app from working.
 
 ## TODO
- - [ ] Profile
-    - [ ] Rework
-    - [ ] Alarm
-    - [ ] Prime
-    - [ ] LED
- - [ ] Rework Presence Detector
- - [ ] Leverage Sensor temperature readings to improve Frozen
- - [ ] Rework MQTT
+ - [ ] Fix Alarm
  - [ ] Sleep Tracking: Heartrate, HRV, Breathing Rate
+ - [ ] Use Sensor's bed temperature readings to improve Frozen
 
 ## Features
 
 1.  Custom temperature profile
-2.  Set a heat and/or vibration wakeup alarm
+2.  Vibration alarms
 3.  Presence detection
 4.  Control config and monitor remotely via MQTT
 5.  `Solo` or `Couples` modes
 6.  LED control & effects
+7.  Daily priming
 
 ## Setup
 
@@ -36,7 +31,7 @@ Eight Sleep's update service and [Add Open Sleep](#adding-open-sleep-).
 - **Note**: the default SSH port for Pod 3 is `8822`.
 - **Disable Updates**: `systemctl disable --now swupdate-progress swupdate defibrillator`
 
-Eventually I will add thorough tutorial for this, but for now I would recommend
+Eventually I will add thorough tutorial for this, but for now I would recommend split-screening
 [Bo Lopker's Tutorial](https://blopker.com/writing/04-zerosleep-1/#disassembly-overview)
 and the [ninesleep instructions](https://github.com/bobobo1618/ninesleep?tab=readme-ov-file#instructions).
 
@@ -55,6 +50,90 @@ Download the `opensleep` binary from release page.
 
 ## MQTT Interface
 
+- `opensleep/`
+  - `presence/`: Person Presense Detection, All RO
+    - `in_bed`: `bool`
+    - `on_left`: `bool`
+    - `on_right`: `bool`
+  - `config/`: Published config from `config.ron`. Modifications will be saved back to `config.ron`. 
+    - `timezone`: RO `string`
+    - `away_mode`: RW `bool`
+    - `prime`: RW `time`
+    - `led/`
+      - `idle`: RW `LedPattern`
+      - `active`: RW `LedPattern`
+    - `mqtt/`
+      - `server`: RO `string`
+      - `port`: RO `u16`
+      - `user`: RO `string`
+    - `profile/` Profile type (`couples` or `solo`) may not be changed in runtime.
+      - `type`: RO `string` (`couples` or `solo`)
+      - `left/` and `right/` for couples, or `solo/` for solo
+        - `sleep`: RW `time`
+        - `wake`: RW `time`
+        - `temperatures`: RW `Vec<celcius>`
+        - `alarm/`: RW `AlarmConfig`
+    - `presence/`
+      - `baselines`: RW `[u16; 6]`
+      - `threshold`: RW `u16`
+      - `debounce_count`: RW `u8`
+  - `calibrate`: WO (triggers presense calibration, do not sit on the bed during this time)
+  - `sensor/` Sensor Subsystem Info, All RO
+    - `mode`: `DeviceMode`
+    - `hwinfo`: `HardwareInfo`
+    - `piezo_ok`: `bool`
+    - `vibration_enabled`: `bool`
+    - `bed_temp`: `[centcel; 6]`
+    - `ambient_temp`: `centcel`
+    - `humidity`: `u16`
+    - `mcu_temp`: `centcel`
+  - `frozen/`: Frozen Subsystem Info, All RO
+    - `mode`: `DeviceMode`
+    - `hwinfo`: `HardwareInfo`
+    - `left_temp`: `centcel` (left side water temperature)
+    - `right_temp`: `centcel`
+    - `heatsink_temp`: `centcel`
+    - `left_target_temp`: `centcel`|`disabled` (target left side water temperature)
+    - `right_target_temp`: `centcel`|`disabled`
+
+  
+### Types
+`time` is a zero-padding 24-hour time string. For example:
+ - `12:00`, `06:00` valid
+ - `6:00`, `5:00 PM`, `5:00pm` invalid
+
+`Vec<T>` is a comma separated list. For example: `111,146,160,185,192,209`
+
+`[T; N]` is a fixed-size comma separated list.
+
+`LedPattern` is a string representation of the Rust enum:
+ - `Fixed( 0, 255, 0, )`
+ - `SlowBreath( 255, 0, 0, )`
+ - `FastBreath( 255, 0, 0, )`
+ - `Rainbow`
+
+`AlarmConfig` may be `None` or a comma-separated list of config, where `PATTERN,INTENSITY,DURATION,OFFSET`. For example:
+ - `Double,80,600,0`
+ - `Single,20,600,0`
+
+`centcel` a u16 representing a temperature in centidegrees celcius IE `deg C * 100`
+
+`celcius` an f32 representing a temperature in degrees celcius
+
+`DeviceMode` one of `Unknown`, `Bootloader`, `Firmware`. `Firmware` means the device is initialized and working properly.
+
+
+`HardwareInfo` is a JSON string, for example:
+```json
+{
+  "devicesn": 67740,
+  "pn": 20600,
+  "sku": 1,
+  "hwrev": 1280,
+  "factoryline": 1,
+  "datecode": 1442061
+}
+```
 
 
 

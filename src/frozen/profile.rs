@@ -2,7 +2,7 @@ use jiff::{SignedDuration, Timestamp, civil::Time, tz::TimeZone};
 
 use crate::{
     common::packet::BedSide,
-    config::{SideConfig, SideConfigType},
+    config::{SideConfig, SidesConfig},
     frozen::packet::FrozenTarget,
 };
 
@@ -10,7 +10,7 @@ impl FrozenTarget {
     pub fn calc_wanted(
         timezone: &TimeZone,
         away_mode: &bool,
-        side_config: &SideConfigType,
+        side_config: &SidesConfig,
         side: &BedSide,
     ) -> Self {
         if *away_mode {
@@ -26,7 +26,7 @@ impl FrozenTarget {
 
 impl SideConfig {
     fn calc_target(&self, now: Time) -> FrozenTarget {
-        if !self.temp_profile.is_empty()
+        if !self.temperatures.is_empty()
             && let Some(t) = self.calc_progress(now)
         {
             return FrozenTarget {
@@ -57,7 +57,7 @@ impl SideConfig {
     #[inline]
     fn lerp(&self, t: f32) -> u16 {
         assert!(
-            !self.temp_profile.is_empty(),
+            !self.temperatures.is_empty(),
             "lerp_self.temp_profile called with empty `self.temp_profile`!"
         );
 
@@ -66,20 +66,20 @@ impl SideConfig {
             "lerp_self.temp_profile called with invalid `t`!"
         );
 
-        let len = self.temp_profile.len();
+        let len = self.temperatures.len();
         if len == 1 {
-            return (self.temp_profile[0] * 100.0) as u16;
+            return (self.temperatures[0] * 100.0) as u16;
         }
 
         let pos = t * (len - 1) as f32;
         let lo_idx = pos as usize;
-        let lo_val = self.temp_profile[lo_idx];
+        let lo_val = self.temperatures[lo_idx];
 
         if lo_idx == len - 1 {
             // last el
             (lo_val * 100.0) as u16
         } else {
-            let hi_val = self.temp_profile[lo_idx + 1];
+            let hi_val = self.temperatures[lo_idx + 1];
             let frac = pos - lo_idx as f32;
             (frac.mul_add((hi_val - lo_val) * 100.0, lo_val * 100.0)) as u16
         }
@@ -110,10 +110,10 @@ mod tests {
     #[test]
     fn test_lerp() {
         let prof = SideConfig {
-            temp_profile: vec![0.0, 10.0, 20.0],
+            temperatures: vec![0.0, 10.0, 20.0],
             sleep: time(18, 0, 0, 0),
             wake: time(6, 0, 0, 0),
-            vibration: None,
+            alarm: None,
         };
 
         assert_eq!(prof.lerp(0.0), 0);
@@ -126,10 +126,10 @@ mod tests {
     #[test]
     fn test_calc_profile_progress() {
         let prof = SideConfig {
-            temp_profile: vec![],
+            temperatures: vec![],
             sleep: time(18, 0, 0, 0),
             wake: time(6, 0, 0, 0),
-            vibration: None,
+            alarm: None,
         };
 
         assert_eq!(prof.calc_progress(time(17, 0, 0, 0)), None);

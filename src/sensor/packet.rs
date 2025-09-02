@@ -28,7 +28,7 @@ pub enum SensorPacket {
     Capacitance(CapacitanceData),
     Piezo(PiezoData),
     Temperature(TemperatureData),
-    /// unknown value, usually 172
+    /// unknown value
     AlarmSet(u8),
 }
 
@@ -97,7 +97,7 @@ impl SensorPacket {
 
     fn parse_alarm_set(buf: BytesMut) -> Result<Self, PacketError> {
         validate_packet_size("Sensor/AlarmSet", &buf, 2)?;
-        Ok(SensorPacket::AlarmSet(buf[0]))
+        Ok(SensorPacket::AlarmSet(buf[1]))
     }
 
     fn parse_piezo_gain_set(buf: BytesMut) -> Result<Self, PacketError> {
@@ -410,7 +410,7 @@ mod tests {
     fn test_alarm_set() {
         assert_eq!(
             SensorPacket::parse(BytesMut::from(&[0xAC, 0x01][..])),
-            Ok(SensorPacket::AlarmSet(0xAC))
+            Ok(SensorPacket::AlarmSet(0x01))
         );
         assert!(SensorPacket::parse(BytesMut::from(&[0xAC][..])).is_err());
     }

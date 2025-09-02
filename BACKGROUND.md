@@ -1,27 +1,38 @@
-## Eight Sleep Background
+# Eight Sleep Background
 
-### Hardware
+## Hardware
 Linux SOM (`VAR-SOM-MX8M-MINI_V1.3`) running pretty minimal Yocto build.
  - Systems runs off 8GB eMMC normally
  - Micro SD card (16GB industrial SanDisk) contains 3 partitions (p1 to boot from, p3 for persistent storage)
     - If the small button is held in during boot, the SOM will boot from the SD card p1
     - It will run a script that will copy `/opt/images/Yocto/rootfs.tar.gz` onto the eMMC, then reboots from eMMC
 
-#### Subsystems
+### Subsystems
 
-"Frozen" (STM32F030CCT6) on the main PCB
- - Manages water temperature control and priming (2 TECs, 1 solenoid, 2 pumps)
+#### "Frozen" (STM32F030CCT6) on the main PCB
+ - Manages:
+   - 2x TECs for water temperature control with PID
+   - 2x Pumps for moving water
+   - Solenoid in tank
+   - Water tank level sensor
+   - Reed Switch
+ - Does priming, water temp control, safety
  - USART control over `/dev/ttymxc0` at 38400 baud
  - Firmware: `/opt/eight/lib/subsystem_updates/firmware-frozen.bbin`
 
-"Sensor-board" on the bed control unit (connected over USB)
- - Manages vibration alarm motors, 6 capacitance sensors (2Hz), 8 bed temperature sensors, ambient sensor (temp + humidity), ADC connected to 2x piezo sensors (1000kHz), heater?
+#### "Sensor board" on the bed control unit (connected over USB)
+ - Manages:
+   - 6x capacitance sensors (2Hz)
+   - 8x bed temperature sensors
+   - Ambient sensor (temp + humidity)
+   - ADC connected to 2x piezo sensors (1000kHz)
+   - Vibration alarm motors
  - USART control over `/dev/ttymxc2` at 38400 baud in bootloader mode and 115200 in firmware mode
  - Firmware: `/opt/eight/lib/subsystem_updates/firmware-sensor.bbin`
 
 
-### Services
-#### Frank (`/opt/eight/bin/frakenfirmware`)
+## Services
+### Frank (`/opt/eight/bin/frakenfirmware`)
 C++ with simple UNIX socket commands. Controls:
  - LEDs over I2C (IS31FL3194)
     - Also controlled by other processes
@@ -34,18 +45,18 @@ C++ with simple UNIX socket commands. Controls:
     - Takes in a left and right ADC gain parameter (default `400`)
  - "Frozen" over UART (`/dev/ttymxc2`), flashes `firmware-frozen.bbin`
     - Takes l/r temperatures and durations
- - TODO water level? solenoid? ...?
  - Uploading Raw sensor data + logs to `raw-api-upload.8slp.net:1337`
+ - What the RAT thermosistor? "ERR:00114015 Thermostat.cpp:220 checkHeatingPowerLevel|RAT bad thermistor, CompTrig set to min 60.00"
 
-#### Device-API-Client (DAC)/PizzaRat (`/home/dac/app`)
+### Device-API-Client (DAC)/PizzaRat (`/home/dac/app`)
 Node TypeScript
  - CoAP for device API `device-api.8slp.net:5684`
  - Basically just a wrapper for Frank
 
-#### SWUpdate
+### SWUpdate
 Gets software updates from `update-api.8slp.net:443`
 
-#### Capybara (`/opt/eight/bin/Eight.Capybara`)
+### Capybara (`/opt/eight/bin/Eight.Capybara`)
 .NET
  - Handles initial setup via Bluetooth
  - Writes `/deviceinfo`

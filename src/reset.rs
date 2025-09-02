@@ -1,6 +1,6 @@
 use embedded_hal::i2c::I2c;
 use linux_embedded_hal::I2cdev;
-use std::time::Duration;
+use std::{error::Error, time::Duration};
 use tokio::time::sleep;
 
 const DEV: &str = "/dev/i2c-1";
@@ -35,13 +35,13 @@ impl ResetController {
         })
     }
 
-    fn write_reg(&mut self, reg: u8, value: u8) -> Result<(), Box<dyn std::error::Error>> {
+    fn write_reg(&mut self, reg: u8, value: u8) -> Result<(), Box<dyn Error>> {
         self.dev.write(ADDR, &[reg, value])?;
         Ok(())
     }
 
-    /// resets and enables subsystems (Frozen + Sensor)
-    pub async fn reset_subsystems(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    /// resets and enables subsystems (Frozen + Sensor?)
+    pub async fn reset_subsystems(&mut self) -> Result<(), Box<dyn Error>> {
         log::info!("Resetting Subsystems...");
 
         // config ports
