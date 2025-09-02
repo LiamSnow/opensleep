@@ -1,69 +1,75 @@
-use frank::error::FrankError;
-use log::{info, LevelFilter, SetLoggerError};
-use scheduler::SchedulerError;
-use settings::{Settings, SettingsError};
-use simplelog::{ColorChoice, CombinedLogger, TermLogger, TerminalMode, WriteLogger};
-use thiserror::Error;
-use std::{fs::File, io};
-use tokio::sync::watch;
+mod common;
+mod config;
+mod frozen;
+mod led;
+mod mqtt;
+mod reset;
+mod sensor;
 
-mod frank;
-mod scheduler;
-mod settings;
-mod api;
+use config::Config;
+use tokio::sync::{mpsc, watch};
 
-#[cfg(test)]
-mod test;
+use crate::{led::IS31FL3194Controller, mqtt::MqttManager, reset::ResetController};
 
-pub const SETTINGS_FILE: &str = "settings.json";
-const LOG_FILE: &str = "opensleep.log";
+#[tokio::main]
+pub async fn main() {
+    env_logger::init();
+    log::info!("Starting OpenSleep...");
 
-#[derive(Error, Debug)]
-pub enum MainError {
-    #[error("api error: `{0}`")]
-    API(#[from] io::Error),
-    #[error("log file creation error: `{0}`")]
-    LogFileCreation(io::Error),
-    #[error("set logger error: `{0}`")]
-    SetLogger(#[from] SetLoggerError),
-    #[error("frank error: `{0}`")]
-    Frank(#[from] FrankError),
-    #[error("scheduler error: `{0}`")]
-    Scheduler(#[from] SchedulerError),
-    #[error("settings error: `{0}`")]
-    Settings(#[from] SettingsError),
-}
+    let config = Config::load("config.ron").unwrap();
+    log::info!("`config.ron` loaded");
+    let (config_tx, config_rx) = watch::channel(config.clone());
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> Result<(), MainError> {
-    CombinedLogger::init(vec![
-        TermLogger::new(
-            LevelFilter::Debug,
-            simplelog::Config::default(),
-            TerminalMode::Mixed,
-            ColorChoice::Auto,
-        ),
-        WriteLogger::new(
-            LevelFilter::Debug,
-            simplelog::Config::default(),
-            File::create(LOG_FILE)
-                .map_err(|e| MainError::LogFileCreation(e))?,
-        ),
-    ])?;
+    log::info!(
+        "Using timezone: {}",
+        config.timezone.iana_name().unwrap_or("ERROR")
+    );
 
-    info!("[Main] Open Sleep starting...");
+    // reset
+    let mut resetter = ResetController::new().unwrap();
+    resetter.reset_subsystems().await.unwrap();
+    let led = IS31FL3194Controller::new(resetter.take());
 
-    info!("[Main] Reading settings file: {SETTINGS_FILE}");
-    let (settings_tx, settings_rx) = watch::channel(Settings::from_file(SETTINGS_FILE)?);
+    let (calibrate_tx, calibrate_rx) = mpsc::channel(32);
 
-    info!("[Main] Finding a Frank");
-    let (frank_tx, frank_state) = frank::run().await?;
+    let mut mqtt_man = MqttManager::new(config_tx.clone(), config_rx.clone(), calibrate_tx);
 
-    info!("[Main] Starting API server");
-    api::run(frank_state, settings_tx, settings_rx.clone()).await?;
+    config.publish(&mut mqtt_man.client);
 
-    info!("[Main] Starting Scheduler...");
-    scheduler::run(frank_tx, settings_rx).await?;
+    tokio::select! {
+        _ = tokio::signal::ctrl_c() => {
+            log::info!("Received ctrl+c signal");
+        }
 
-    Ok(())
+        res = frozen::run(
+            frozen::PORT,
+            config_rx.clone(),
+            led,
+            mqtt_man.client.clone()
+        ) => {
+            match res {
+                Ok(_) => log::error!("Frozen task unexpectedly exited"),
+                Err(e) => log::error!("Frozen task failed: {e}"),
+            }
+        }
+
+        res = sensor::run(
+            sensor::PORT,
+            config_tx,
+            config_rx,
+            calibrate_rx,
+            mqtt_man.client.clone()
+        ) => {
+            match res {
+                Ok(_) => log::error!("Sensor task unexpectedly exited"),
+                Err(e) => log::error!("Sensor task failed: {e}"),
+            }
+        }
+
+        _ = mqtt_man.run() => {
+            log::error!("MQTT manager unexpectedly exited");
+        }
+    }
+
+    log::info!("Shutting down OpenSleep...");
 }

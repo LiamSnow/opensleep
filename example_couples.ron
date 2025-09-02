@@ -1,0 +1,39 @@
+(
+    timezone: "America/New_York",
+    away_mode: false,
+    prime: "15:00",
+    led: (
+        idle: Fixed(0, 255, 0),
+        active: SlowBreath(255, 0, 0),      
+    ),
+    mqtt: (
+        server: "homeassistant.local",
+        port: 1883,
+        user: "example",
+        password: "1234"       
+    ),
+    profile: Couples(
+        left: (
+            temperatures: [27, 29, 31],
+            sleep: "22:00",
+            wake: "10:30",
+            alarm: (
+                pattern: Double,
+                intensity: 80,
+                duration: 600,
+                offset: 300,
+            ),
+        ),
+        right: (
+            temperatures: [27, 29, 31],
+            sleep: "22:00",
+            wake: "10:30",
+            vibration: (
+                pattern: Rise,
+                intensity: 80,
+                duration: 600,
+                offset: 300,
+            ),
+        ),
+    ),
+)

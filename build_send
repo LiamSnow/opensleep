@@ -1,0 +1,4 @@
+#!/bin/bash
+cargo build --target aarch64-unknown-linux-musl --release
+scp -P 8822 -i ~/.ssh/monolith_boot -O target/aarch64-unknown-linux-musl/release/opensleep root@192.168.1.43:~
+scp -P 8822 -i ~/.ssh/monolith_boot -O config.ron root@192.168.1.43:~
