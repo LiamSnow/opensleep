@@ -1,5 +1,5 @@
 [Unit]
-Description=Open Sleep
+Description=opensleep
 
 [Install]
 WantedBy=multi-user.target
@@ -10,3 +10,6 @@ ExecStart=/opt/opensleep/opensleep
 WorkingDirectory=/opt/opensleep
 Restart=always
 Type=simple
+RestartSec=5
+StartLimitInterval=60
+StartLimitBurst=3

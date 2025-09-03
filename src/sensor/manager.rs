@@ -5,7 +5,7 @@ use crate::common::codec::PacketCodec;
 use crate::common::packet::BedSide;
 use crate::common::serial::{DeviceMode, SerialError, create_framed_port};
 use crate::config::{Config, SidesConfig};
-use crate::sensor::command::AlarmCommand;
+use crate::sensor::command::{AlarmCommand, AlarmPattern};
 use crate::sensor::presence::PresenseManager;
 use crate::sensor::state::{PIEZO_FREQ, PIEZO_GAIN, SensorState};
 use crate::sensor::{SensorCommand, SensorPacket};
@@ -249,15 +249,15 @@ fn get_alarm_cmd(
             }));
         }
     } else if alarm_running {
-        log::info!("Alarm[{side}] should NOT be running, but is. Cancelling now.");
+        log::info!("Alarm[{side}] should NOT be running, but is. Trying to cancel.");
         // FIXME TODO not working
-        return Some(SensorCommand::ClearAlarm);
-        // return Some(SensorCommand::SetAlarm(AlarmCommand {
-        //     side: *side,
-        //     intensity: 0,
-        //     duration: 0,
-        //     pattern: AlarmPattern::Double,
-        // }));
+        // return Some(SensorCommand::ClearAlarm);
+        return Some(SensorCommand::SetAlarm(AlarmCommand {
+            side: *side,
+            intensity: 0,
+            duration: 0,
+            pattern: AlarmPattern::Double,
+        }));
     }
 
     None

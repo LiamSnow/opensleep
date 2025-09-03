@@ -33,6 +33,7 @@ pub async fn main() {
     let (calibrate_tx, calibrate_rx) = mpsc::channel(32);
 
     let mut mqtt_man = MqttManager::new(config_tx.clone(), config_rx.clone(), calibrate_tx);
+    mqtt_man.wait_for_conn().await;
 
     config.publish(&mut mqtt_man.client);
 

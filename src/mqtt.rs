@@ -1,5 +1,5 @@
 use crate::config::{self, Config};
-use rumqttc::{AsyncClient, Event, EventLoop, MqttOptions, Packet, Publish, QoS};
+use rumqttc::{AsyncClient, ConnectionError, Event, EventLoop, MqttOptions, Packet, Publish, QoS};
 use std::time::Duration;
 use tokio::sync::{mpsc, watch};
 
@@ -43,25 +43,42 @@ impl MqttManager {
         }
     }
 
+    pub async fn wait_for_conn(&mut self) {
+        loop {
+            let msg = self.eventloop.poll().await;
+            if self.handle_msg(msg).await {
+                return;
+            }
+        }
+    }
+
+    /// returns true if connected
+    async fn handle_msg(&mut self, msg: Result<Event, ConnectionError>) -> bool {
+        match msg {
+            Ok(Event::Incoming(Packet::ConnAck(_))) => {
+                log::info!("MQTT broker connected");
+                self.subscribe("opensleep/config/+").await;
+                self.subscribe("opensleep/calibrate").await;
+                return true;
+            }
+            Ok(Event::Incoming(Packet::Disconnect)) => {
+                log::warn!("MQTT broker disconnected");
+            }
+            Ok(Event::Incoming(Packet::Publish(publ))) => {
+                self.handle_publ(publ);
+            }
+            Ok(_) => {}
+            Err(e) => {
+                log::error!("MQTT event loop error: {e}");
+            }
+        }
+        false
+    }
+
     pub async fn run(mut self) {
         loop {
-            match self.eventloop.poll().await {
-                Ok(Event::Incoming(Packet::ConnAck(_))) => {
-                    log::info!("MQTT broker connected");
-                    self.subscribe("opensleep/config/+").await;
-                    self.subscribe("opensleep/calibrate").await;
-                }
-                Ok(Event::Incoming(Packet::Disconnect)) => {
-                    log::warn!("MQTT broker disconnected");
-                }
-                Ok(Event::Incoming(Packet::Publish(publ))) => {
-                    self.handle_publ(publ);
-                }
-                Ok(_) => {}
-                Err(e) => {
-                    log::error!("MQTT event loop error: {e}");
-                }
-            }
+            let msg = self.eventloop.poll().await;
+            self.handle_msg(msg).await;
         }
     }
 
