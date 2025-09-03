@@ -10,6 +10,7 @@ WARNING: The use of opensleep will prevent the mobile app from working.
  - [ ] Fix Alarm
  - [ ] Sleep Tracking: Heartrate, HRV, Breathing Rate
  - [ ] Use Sensor's bed temperature readings to improve Frozen
+ - [ ] More advanced LED patterns using direct current level control
 
 ## Features
 
