@@ -62,6 +62,7 @@ Download the `opensleep` binary from release page.
     - `led/`
       - `idle`: RW `LedPattern`
       - `active`: RW `LedPattern`
+      - `band`: RW `CurrentBand`
     - `mqtt/`
       - `server`: RO `string`
       - `port`: RO `u16`
@@ -110,7 +111,13 @@ Download the `opensleep` binary from release page.
  - `Fixed( 0, 255, 0, )`
  - `SlowBreath( 255, 0, 0, )`
  - `FastBreath( 255, 0, 0, )`
- - `Rainbow`
+ - See code for more patterns
+
+`CurrentBand`:
+ - `One`: 0mA\~10mA, Imax=10mA
+ - `Two`: 0mA\~20mA, Imax=20mA
+ - `Three`: 0mA\~30mA, Imax=30mA
+ - `Four`: 0mA\~40mA, Imax=40mA
 
 `AlarmConfig` may be `None` or a comma-separated list of config, where `PATTERN,INTENSITY,DURATION,OFFSET`. For example:
  - `Double,80,600,0`

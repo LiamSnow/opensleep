@@ -7,4 +7,5 @@ pub mod patterns;
 mod tests;
 
 pub use controller::IS31FL3194Controller;
+pub use model::{CurrentBand, IS31FL3194Config};
 pub use patterns::LedPattern;

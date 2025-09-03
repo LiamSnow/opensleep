@@ -1,7 +1,6 @@
 use embedded_hal::i2c::I2c;
 
 use super::model::*;
-use super::patterns::LedPattern;
 
 /// I2C wrapper for the IS31FL3194 LED controller
 /// Forced to RGB mode
@@ -28,19 +27,19 @@ impl<T: I2c> IS31FL3194Controller<T> {
         Ok(())
     }
 
-    pub fn set(&mut self, pattern: &LedPattern) -> Result<(), T::Error> {
-        self.set_raw(pattern.get_config())
-    }
+    pub fn set(&mut self, cfg: &IS31FL3194Config) -> Result<(), T::Error> {
+        // self.reset()?;
 
-    pub(crate) fn set_raw(&mut self, cfg: IS31FL3194Config) -> Result<(), T::Error> {
-        self.set_mode(cfg.mode.get_reg_value())?;
+        self.set_mode(&cfg.mode)?;
+        self.set_current_band(cfg.band.clone())?;
         self.set_out_enabled(cfg.enabled)?;
-        self.set_current_band(cfg.band)?;
 
-        match cfg.mode {
-            OperatingMode::CurrentLevel(r, g, b) => self.current_level(r, g, b),
-            OperatingMode::Pattern(p1, p2, p3) => self.patterns([p1, p2, p3]),
+        match &cfg.mode {
+            OperatingMode::CurrentLevel(r, g, b) => self.current_level(*r, *g, *b)?,
+            OperatingMode::Pattern(p1, p2, p3) => self.patterns([p1, p2, p3])?,
         }
+
+        self.update_colors()
     }
 
     fn set_current_band(&mut self, band: CurrentBand) -> Result<(), T::Error> {
@@ -57,21 +56,29 @@ impl<T: I2c> IS31FL3194Controller<T> {
         )
     }
 
-    fn set_mode(&mut self, mode: u8) -> Result<(), T::Error> {
+    fn set_mode(&mut self, mode: &OperatingMode) -> Result<(), T::Error> {
         const REG_OP_CONFIG: u8 = 0x01;
+        use OperatingMode::*;
+        let out_mode = match mode {
+            CurrentLevel(..) => 0b000,
+            Pattern(..) => 0b111,
+        };
+        let led_mode = match mode {
+            // Single mode
+            CurrentLevel(..) => 0b00,
+            // RGB mode
+            Pattern(..) => 0b10,
+        };
         self.write_reg(
             REG_OP_CONFIG,
-            (mode << 6) |
-            (mode << 5) |
-            (mode << 4) |
-            // RGB mode
-            (0b10 << 1) |
-            // 0 = software shutdown, 1 = enabled
+            (out_mode << 4) |
+            (led_mode << 1) |
+            // 0 = software shutdown, 1 = normal operation
             0b1,
         )
     }
 
-    fn patterns(&mut self, patterns: [Option<PatternConfig>; 3]) -> Result<(), T::Error> {
+    fn patterns(&mut self, patterns: [&Option<PatternConfig>; 3]) -> Result<(), T::Error> {
         for (pn, pattern) in patterns.into_iter().enumerate() {
             let pn = pn as u8;
 
@@ -90,32 +97,37 @@ impl<T: I2c> IS31FL3194Controller<T> {
                     pattern.colors[2].repeat.clone(),
                 )?;
 
-                for (cn, color) in pattern.colors.into_iter().enumerate() {
+                for (cn, color) in pattern.colors.iter().enumerate() {
                     self.pattern_color(pn, cn as u8, color.r, color.g, color.b)?;
                 }
 
-                self.pattern_nxt(pn, pattern.next, pattern.gamma, pattern.multipulse_repeat)?;
-                self.pattern_repeat(pn, pattern.pattern_repeat)?;
+                self.pattern_nxt(
+                    pn,
+                    &pattern.next,
+                    &pattern.gamma,
+                    &pattern.multipulse_repeat,
+                )?;
+                self.pattern_repeat(pn, &pattern.pattern_repeat)?;
 
                 self.pattern_update_run(pn)?;
 
-                self.pattern_timing(pn, pattern.timing)?;
+                self.pattern_timing(pn, &pattern.timing)?;
             }
         }
 
         // self.pattern_update_run(0)?;
 
-        self.update_colors()
+        Ok(())
     }
 
-    fn pattern_repeat(&mut self, pattern: u8, repeat: Repeat) -> Result<(), T::Error> {
+    fn pattern_repeat(&mut self, pattern: u8, repeat: &Repeat) -> Result<(), T::Error> {
         assert!(pattern <= 2, "`pattern` must be 0-2");
         let reg = 0x1F + (pattern * 0x10);
         self.write_reg(
             reg,
             match repeat {
                 Repeat::Endless => 0,
-                Repeat::Count(n) => n,
+                Repeat::Count(n) => *n,
             },
         )
     }
@@ -144,7 +156,7 @@ impl<T: I2c> IS31FL3194Controller<T> {
     }
 
     /// pattern 0-2
-    pub(crate) fn pattern_timing(&mut self, pattern: u8, timing: Timing) -> Result<(), T::Error> {
+    pub(crate) fn pattern_timing(&mut self, pattern: u8, timing: &Timing) -> Result<(), T::Error> {
         assert!(pattern <= 2, "`pattern` must be 0-2");
         let offset = pattern * 0x10;
         let reg_pn_start_rise = offset + 0x19;
@@ -192,16 +204,16 @@ impl<T: I2c> IS31FL3194Controller<T> {
     fn pattern_nxt(
         &mut self,
         pattern: u8,
-        next: PatternNext,
-        gamma: Gamma,
-        repeat: Repeat,
+        next: &PatternNext,
+        gamma: &Gamma,
+        repeat: &Repeat,
     ) -> Result<(), T::Error> {
         assert!(pattern <= 2, "`pattern` must be 0-2");
         let reg = (pattern * 0x10) + 0x1E;
 
         let mtply = match repeat {
             Repeat::Endless => 0,
-            Repeat::Count(n) => n,
+            Repeat::Count(n) => *n,
         };
 
         let next = match next {
@@ -222,7 +234,7 @@ impl<T: I2c> IS31FL3194Controller<T> {
         };
 
         // [7:4] Multy, [3:2] Gam, [1:0] Next
-        self.write_reg(reg, (mtply << 4) | ((gamma as u8) << 2) | next)
+        self.write_reg(reg, (mtply << 4) | ((gamma.clone() as u8) << 2) | next)
     }
 
     fn pattern_update_run(&mut self, pattern: u8) -> Result<(), T::Error> {
@@ -232,6 +244,7 @@ impl<T: I2c> IS31FL3194Controller<T> {
         self.write_reg(reg, UPDATE_VALUE)
     }
 
+    /// updates data of 10h\~18h, 20h\~28h, 30h\~38h
     fn update_colors(&mut self) -> Result<(), T::Error> {
         const REG_COLOR_UPDATE: u8 = 0x40;
         const UPDATE_VALUE: u8 = 0xC5;

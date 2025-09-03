@@ -2,7 +2,7 @@ use std::{borrow::Cow, error::Error};
 
 use crate::mqtt::publish_guaranteed;
 
-use super::{AlarmConfig, Config, SidesConfig, CONFIG_FILE};
+use super::{AlarmConfig, CONFIG_FILE, Config, SidesConfig};
 use rumqttc::AsyncClient;
 use tokio::sync::watch;
 
@@ -12,6 +12,7 @@ const TOPIC_PRIME_TIME: &str = "opensleep/config/prime_time";
 
 const TOPIC_LED_IDLE: &str = "opensleep/config/led/idle";
 const TOPIC_LED_ACTIVE: &str = "opensleep/config/led/active";
+const TOPIC_LED_BAND: &str = "opensleep/config/led/band";
 
 const TOPIC_MQTT_SERVER: &str = "opensleep/config/mqtt/server";
 const TOPIC_MQTT_PORT: &str = "opensleep/config/mqtt/port";
@@ -54,6 +55,7 @@ impl Config {
         // led
         publish_guaranteed(client, TOPIC_LED_IDLE, true, self.led.idle.to_string());
         publish_guaranteed(client, TOPIC_LED_ACTIVE, true, self.led.active.to_string());
+        publish_guaranteed(client, TOPIC_LED_BAND, true, self.led.band.to_string());
 
         // mqtt
         publish_guaranteed(

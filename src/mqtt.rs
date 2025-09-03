@@ -1,6 +1,6 @@
 use crate::config::{self, Config};
 use rumqttc::{AsyncClient, ConnectionError, Event, EventLoop, MqttOptions, Packet, Publish, QoS};
-use std::time::Duration;
+use std::{fmt::Display, time::Duration};
 use tokio::sync::{mpsc, watch};
 
 pub struct MqttManager {
@@ -120,17 +120,17 @@ impl MqttManager {
 
 pub fn publish<S, V>(client: &mut AsyncClient, topic: S, qos: QoS, retain: bool, payload: V)
 where
-    S: Into<String>,
+    S: Into<String> + Display + Clone,
     V: Into<Vec<u8>>,
 {
-    if let Err(e) = client.try_publish(topic, qos, retain, payload) {
-        log::error!("Error publishing: {e}",);
+    if let Err(e) = client.try_publish(topic.clone(), qos, retain, payload) {
+        log::error!("Error publishing to {topic}: {e}",);
     }
 }
 
 pub fn publish_guaranteed<S, V>(client: &mut AsyncClient, topic: S, retain: bool, payload: V)
 where
-    S: Into<String>,
+    S: Into<String> + Display + Clone,
     V: Into<Vec<u8>>,
 {
     publish(client, topic, QoS::ExactlyOnce, retain, payload);
@@ -138,7 +138,7 @@ where
 
 pub fn publish_high_freq<S, V>(client: &mut AsyncClient, topic: S, payload: V)
 where
-    S: Into<String>,
+    S: Into<String> + Display + Clone,
     V: Into<Vec<u8>>,
 {
     publish(client, topic, QoS::AtMostOnce, false, payload);

@@ -5,7 +5,7 @@ use std::fs;
 use thiserror::Error;
 
 use crate::common::packet::BedSide;
-use crate::led::LedPattern;
+use crate::led::{CurrentBand, LedPattern};
 use crate::sensor::command::AlarmPattern;
 
 pub mod mqtt;
@@ -26,6 +26,7 @@ pub enum ConfigError {
 pub struct LEDConfig {
     pub idle: LedPattern,
     pub active: LedPattern,
+    pub band: CurrentBand,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

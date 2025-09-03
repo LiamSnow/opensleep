@@ -1,3 +1,6 @@
+use serde::{Deserialize, Serialize};
+use strum_macros::{Display, EnumString};
+
 #[derive(Clone)]
 pub struct IS31FL3194Config {
     pub enabled: bool,
@@ -40,16 +43,7 @@ pub enum OperatingMode {
     ),
 }
 
-impl OperatingMode {
-    pub fn get_reg_value(&self) -> u8 {
-        match self {
-            OperatingMode::CurrentLevel(..) => 0b0,
-            OperatingMode::Pattern(..) => 0b1,
-        }
-    }
-}
-
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Serialize, Deserialize, PartialEq, Debug, EnumString, Display)]
 #[repr(u8)]
 pub enum CurrentBand {
     /// 0mA\~10mA, Imax=10mA
@@ -124,7 +118,7 @@ pub enum Repeat {
 /// 1101 6.20s
 /// 1110 7.30s
 /// 1111 8.30s
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct Timing {
     pub start: u8,
     pub rise: u8,

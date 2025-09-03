@@ -43,7 +43,8 @@ impl FrozenState {
     }
 
     pub fn is_active(&self) -> bool {
-        self.left_target.is_some() || self.right_target.is_some()
+        self.left_target.as_ref().is_some_and(|t| t.enabled)
+            || self.right_target.as_ref().is_some_and(|t| t.enabled)
     }
 
     pub fn handle_packet(&mut self, client: &mut AsyncClient, packet: FrozenPacket) {

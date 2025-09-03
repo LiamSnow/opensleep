@@ -163,7 +163,7 @@ impl SensorState {
                     client,
                     TOPIC_BED_TEMP,
                     format!(
-                        "{}{}{}{}{}{}",
+                        "{},{},{},{},{},{}",
                         u.bed[0], u.bed[1], u.bed[2], u.bed[3], u.bed[4], u.bed[5]
                     ),
                 );

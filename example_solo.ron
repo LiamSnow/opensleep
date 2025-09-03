@@ -5,6 +5,7 @@
     led: (
         idle: Fixed(0, 255, 0),
         active: SlowBreath(255, 0, 0),      
+        band: Three,
     ),
     mqtt: (
         server: "homeassistant.local",

@@ -1,11 +1,14 @@
-use crate::common::{
-    codec::PacketCodec,
-    packet::BedSide,
-    serial::{SerialError, create_framed_port},
-};
 use crate::config::{Config, LEDConfig, SidesConfig};
 use crate::frozen::{FrozenCommand, FrozenPacket, packet::FrozenTarget, state::FrozenState};
-use crate::led::IS31FL3194Controller;
+use crate::led::{IS31FL3194Config, IS31FL3194Controller};
+use crate::{
+    common::{
+        codec::PacketCodec,
+        packet::BedSide,
+        serial::{SerialError, create_framed_port},
+    },
+    led::LedPattern,
+};
 use futures_util::{SinkExt, StreamExt, stream::SplitSink};
 use jiff::{SignedDuration, Timestamp, civil::Time, tz::TimeZone};
 use linux_embedded_hal::I2cdev;
@@ -40,8 +43,9 @@ pub async fn run(
     log::info!("Initializing Frozen Subsystem...");
 
     let cfg = config_rx.borrow_and_update();
-    let led_config = cfg.led.clone();
-    set_led(&mut led, &led_config, false);
+    let mut led_idle = cfg.led.idle.get_config(cfg.led.band.clone());
+    let mut led_active = cfg.led.active.get_config(cfg.led.band.clone());
+    set_led(&mut led, &led_idle);
     let timezone = cfg.timezone.clone();
     let mut away_mode = cfg.away_mode;
     let mut prime = cfg.prime;
@@ -68,8 +72,14 @@ pub async fn run(
                     state.handle_packet(&mut client, packet);
 
                     if state.is_active() != was_active {
+                        if was_active {
+                            log::info!("Profile ended!");
+                            set_led(&mut led, &led_idle);
+                        } else {
+                            log::info!("Starting profile!");
+                            set_led(&mut led, &led_active);
+                        }
                         was_active = !was_active;
-                        set_led(&mut led, &led_config, was_active);
                     }
                 }
                 Err(e) => {
@@ -112,6 +122,8 @@ pub async fn run(
                 away_mode = cfg.away_mode;
                 prime = cfg.prime;
                 side_config = cfg.profile.clone();
+                led_idle = cfg.led.idle.get_config(cfg.led.band.clone());
+                led_active = cfg.led.active.get_config(cfg.led.band.clone());
             }
         }
     }
@@ -180,13 +192,8 @@ async fn send_command(writer: &mut Writer, cmd: FrozenCommand) {
     }
 }
 
-fn set_led(led: &mut IS31FL3194Controller<I2cdev>, led_config: &LEDConfig, active: bool) {
-    let pattern = if active {
-        &led_config.active
-    } else {
-        &led_config.idle
-    };
-    if let Err(e) = led.set(pattern) {
+fn set_led(led: &mut IS31FL3194Controller<I2cdev>, cfg: &IS31FL3194Config) {
+    if let Err(e) = led.set(cfg) {
         log::error!("Failed to set LED: {e}");
     }
 }
