@@ -1,5 +1,7 @@
 use super::*;
 
+// TODO more testing (esp for MQTT)
+
 #[test]
 fn test_load_solo_config() {
     let config = Config::load("example_solo.ron").unwrap();

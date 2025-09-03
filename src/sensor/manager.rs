@@ -1,3 +1,4 @@
+use std::io::ErrorKind;
 use std::time::Duration;
 
 use crate::common::codec::PacketCodec;
@@ -315,7 +316,7 @@ async fn ping_device(
     }
 
     Err(SerialError::Io(std::io::Error::new(
-        std::io::ErrorKind::NotFound,
+        ErrorKind::NotFound,
         "Device not responding",
     )))
 }
@@ -332,7 +333,7 @@ async fn wait_for_mode(
     while state.device_mode != target_mode {
         if start.elapsed() > timeout_duration {
             return Err(SerialError::Io(std::io::Error::new(
-                std::io::ErrorKind::TimedOut,
+                ErrorKind::TimedOut,
                 "Timed out waiting for mode change",
             )));
         }

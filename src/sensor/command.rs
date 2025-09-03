@@ -26,7 +26,7 @@ pub enum SensorCommand {
     ProbeTemperature,
     SetAlarm(AlarmCommand),
     // TODO add resp packet + 0x80
-    /// UNVERIFIED
+    /// UNVERIFIED probably doesn't actually exist or requires some payload, seems to be crashing the mcu, or maybe its just a constant vibration mode idk
     #[allow(dead_code)]
     ClearAlarm,
     // TODO add resp packet + 0x80

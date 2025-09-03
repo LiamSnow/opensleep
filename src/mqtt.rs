@@ -48,7 +48,6 @@ impl MqttManager {
             match self.eventloop.poll().await {
                 Ok(Event::Incoming(Packet::ConnAck(_))) => {
                     log::info!("MQTT broker connected");
-                    // TODO
                     self.subscribe("opensleep/config/+").await;
                     self.subscribe("opensleep/calibrate").await;
                 }

@@ -23,10 +23,10 @@ WARNING: The use of opensleep will prevent the mobile app from working.
 
 ## Setup
 
-To use Open Sleep you must disassemble the Eight Sleep Pod 3, modify the SD card's `rootfs.tar.gz`
+To use opensleep you must disassemble the Eight Sleep Pod 3, modify the SD card's `rootfs.tar.gz`
 to add your SSH key + root password, and reset the Pod. Then power the Pod while holding the small
 button on the back, which performs a factory reset from `rootfs.tar.gz`. Now you can disable
-Eight Sleep's update service and [Add Open Sleep](#adding-open-sleep-).
+Eight Sleep's update service and [Add opensleep](#adding-open-sleep-).
 
 - **Note**: the default SSH port for Pod 3 is `8822`.
 - **Disable Updates**: `systemctl disable --now swupdate-progress swupdate defibrillator`
@@ -39,14 +39,14 @@ and the [ninesleep instructions](https://github.com/bobobo1618/ninesleep?tab=rea
 
 Make a new `config.ron` file. See the examples `example_couples.ron` and `example_solo.ron`.
 
-### Adding Open Sleep
+### Adding opensleep
 
 Download the `opensleep` binary from release page.
 
 1.  Stop services `systemctl disable --now dac frank capybara swupdate-progress swupdate defibrillator eight-kernel telegraf vector`
 2.  Place the binary `opensleep` and `config.ron` at `/opt/opensleep`
 3.  Place the service `opensleep.service` at `/lib/systemd/system`
-4.  Enable Open Sleep `systemctl enable --now opensleep`
+4.  Enable opensleep `systemctl enable --now opensleep`
 
 ## MQTT Interface
 

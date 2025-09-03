@@ -95,23 +95,39 @@ mod tests {
     use hex_literal::hex;
 
     #[test]
-    fn test_frozen_commands() {
+    fn test_ping() {
         assert_eq!(
             FrozenCommand::Ping.to_bytes(),
             hex!("7E 01 01 DC BD").to_vec()
         );
+    }
+
+    #[test]
+    fn test_gethardwareinfo() {
         assert_eq!(
             FrozenCommand::GetHardwareInfo.to_bytes(),
             hex!("7E 01 02 EC DE").to_vec()
         );
+    }
+
+    #[test]
+    fn test_getfirmware() {
         assert_eq!(
             FrozenCommand::GetFirmware.to_bytes(),
             hex!("7E 01 04 8C 18").to_vec()
         );
+    }
+
+    #[test]
+    fn test_jumptofirmware() {
         assert_eq!(
             FrozenCommand::JumpToFirmware.to_bytes(),
             hex!("7E 01 10 DE AD").to_vec()
         );
+    }
+
+    #[test]
+    fn test_prime() {
         assert_eq!(
             FrozenCommand::Prime.to_bytes(),
             hex!("7E 01 52 b6 2b").to_vec()
@@ -119,7 +135,7 @@ mod tests {
     }
 
     #[test]
-    fn test_temperature_commands() {
+    fn test_temp() {
         let cmd = FrozenCommand::SetTargetTemperature {
             side: BedSide::Left,
             tar: FrozenTarget {

@@ -138,6 +138,9 @@ fn test_single_pattern_mode() {
     // P1
     mock.expect_write(I2C_ADDR, vec![0x1C, 0b00000001]);
 
+    // P1 color repeat
+    mock.expect_write(I2C_ADDR, vec![0x1D, 0b00000000]);
+
     // P1 C1 BRG
     mock.expect_write(I2C_ADDR, vec![0x10, 50]);
     mock.expect_write(I2C_ADDR, vec![0x11, 255]);
@@ -154,6 +157,7 @@ fn test_single_pattern_mode() {
     mock.expect_write(I2C_ADDR, vec![0x18, 0]);
 
     mock.expect_write(I2C_ADDR, vec![0x1E, 0b00110000]); // 3 loops, gamma 2.4, stop
+    mock.expect_write(I2C_ADDR, vec![0x1F, 1]);
     mock.expect_write(I2C_ADDR, vec![0x41, 0xC5]);
 
     // P1 timing
@@ -217,6 +221,9 @@ fn test_multi_pattern_transitions() {
     // P1 colors
     mock.expect_write(I2C_ADDR, vec![0x1C, 0b00000011]); // enable colors 1 and 2
 
+    // P1 color repeat
+    mock.expect_write(I2C_ADDR, vec![0x1D, 0x00]);
+
     // P1 C1
     mock.expect_write(I2C_ADDR, vec![0x10, 255]);
     mock.expect_write(I2C_ADDR, vec![0x11, 0]);
@@ -233,6 +240,7 @@ fn test_multi_pattern_transitions() {
     mock.expect_write(I2C_ADDR, vec![0x18, 0]);
 
     mock.expect_write(I2C_ADDR, vec![0x1E, 0b00000001]); // endless, gamma 2.4, goto next
+    mock.expect_write(I2C_ADDR, vec![0x1F, 1]); // repeat once
     mock.expect_write(I2C_ADDR, vec![0x41, 0xC5]);
     mock.expect_write(I2C_ADDR, vec![0x19, 0b00000000]);
     mock.expect_write(I2C_ADDR, vec![0x1A, 0b00000000]);
@@ -240,6 +248,9 @@ fn test_multi_pattern_transitions() {
 
     // P2 colors
     mock.expect_write(I2C_ADDR, vec![0x2C, 0b00000001]);
+
+    // P2 color repeat
+    mock.expect_write(I2C_ADDR, vec![0x2D, 0b00000000]);
 
     // P2 C1
     mock.expect_write(I2C_ADDR, vec![0x20, 0]);
@@ -257,6 +268,8 @@ fn test_multi_pattern_transitions() {
     mock.expect_write(I2C_ADDR, vec![0x28, 0]);
 
     mock.expect_write(I2C_ADDR, vec![0x2E, 0b00001010]); // endless, linearity, goto next
+    mock.expect_write(I2C_ADDR, vec![0x2F, 1]); //repeat once
+
     mock.expect_write(I2C_ADDR, vec![0x42, 0xC5]);
     mock.expect_write(I2C_ADDR, vec![0x29, 0b00110010]);
     mock.expect_write(I2C_ADDR, vec![0x2A, 0b00000000]);

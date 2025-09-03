@@ -2,7 +2,7 @@ use std::{borrow::Cow, error::Error};
 
 use crate::mqtt::publish_guaranteed;
 
-use super::{AlarmConfig, CONFIG_FILE, Config, SidesConfig};
+use super::{AlarmConfig, Config, SidesConfig, CONFIG_FILE};
 use rumqttc::AsyncClient;
 use tokio::sync::watch;
 

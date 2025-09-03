@@ -58,13 +58,10 @@ impl SideConfig {
     fn lerp(&self, t: f32) -> u16 {
         assert!(
             !self.temperatures.is_empty(),
-            "lerp_self.temp_profile called with empty `self.temp_profile`!"
+            "lerp called with empty `self.temperatures`!"
         );
 
-        assert!(
-            (0.0..=1.0).contains(&t),
-            "lerp_self.temp_profile called with invalid `t`!"
-        );
+        assert!((0.0..=1.0).contains(&t), "lerp called with invalid `t`!");
 
         let len = self.temperatures.len();
         if len == 1 {
