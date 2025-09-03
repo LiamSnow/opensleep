@@ -89,6 +89,7 @@ pub enum Gamma {
     /// gamma = 2.4
     Gamma2_4 = 0b00,
     /// gamma = 3.5
+    #[allow(dead_code)]
     Gamma3_5 = 0b01,
     #[allow(dead_code)]
     Linearity = 0b10,
