@@ -60,9 +60,9 @@ Download the `opensleep` binary from release page.
     - `away_mode`: RW `bool`
     - `prime`: RW `time`
     - `led/`
-      - `idle`: RW `LedPattern`
-      - `active`: RW `LedPattern`
-      - `band`: RW `CurrentBand`
+      - `idle`: RO `LedPattern`
+      - `active`: RO `LedPattern`
+      - `band`: RO `CurrentBand`
     - `mqtt/`
       - `server`: RO `string`
       - `port`: RO `u16`
@@ -130,17 +130,7 @@ Download the `opensleep` binary from release page.
 `DeviceMode` one of `Unknown`, `Bootloader`, `Firmware`. `Firmware` means the device is initialized and working properly.
 
 
-`HardwareInfo` is a JSON string, for example:
-```json
-{
-  "devicesn": 67740,
-  "pn": 20600,
-  "sku": 1,
-  "hwrev": 1280,
-  "factoryline": 1,
-  "datecode": 1442061
-}
-```
+`HardwareInfo`: ex. `SN 000157e2 PN 20500 SKU 2 HWREV 0502 FACTORYFLAG 1 DATECODE 16070c`
 
 
 

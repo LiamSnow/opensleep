@@ -1,14 +1,11 @@
-use crate::config::{Config, LEDConfig, SidesConfig};
+use crate::common::{
+    codec::PacketCodec,
+    packet::BedSide,
+    serial::{SerialError, create_framed_port},
+};
+use crate::config::{Config, SidesConfig};
 use crate::frozen::{FrozenCommand, FrozenPacket, packet::FrozenTarget, state::FrozenState};
 use crate::led::{IS31FL3194Config, IS31FL3194Controller};
-use crate::{
-    common::{
-        codec::PacketCodec,
-        packet::BedSide,
-        serial::{SerialError, create_framed_port},
-    },
-    led::LedPattern,
-};
 use futures_util::{SinkExt, StreamExt, stream::SplitSink};
 use jiff::{SignedDuration, Timestamp, civil::Time, tz::TimeZone};
 use linux_embedded_hal::I2cdev;
@@ -43,8 +40,8 @@ pub async fn run(
     log::info!("Initializing Frozen Subsystem...");
 
     let cfg = config_rx.borrow_and_update();
-    let mut led_idle = cfg.led.idle.get_config(cfg.led.band.clone());
-    let mut led_active = cfg.led.active.get_config(cfg.led.band.clone());
+    let led_idle = cfg.led.idle.get_config(cfg.led.band.clone());
+    let led_active = cfg.led.active.get_config(cfg.led.band.clone());
     set_led(&mut led, &led_idle);
     let timezone = cfg.timezone.clone();
     let mut away_mode = cfg.away_mode;
@@ -122,8 +119,6 @@ pub async fn run(
                 away_mode = cfg.away_mode;
                 prime = cfg.prime;
                 side_config = cfg.profile.clone();
-                led_idle = cfg.led.idle.get_config(cfg.led.band.clone());
-                led_active = cfg.led.active.get_config(cfg.led.band.clone());
             }
         }
     }

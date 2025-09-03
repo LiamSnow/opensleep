@@ -53,8 +53,13 @@ impl Config {
         publish_guaranteed(client, TOPIC_PRIME_TIME, true, self.prime.to_string());
 
         // led
-        publish_guaranteed(client, TOPIC_LED_IDLE, true, self.led.idle.to_string());
-        publish_guaranteed(client, TOPIC_LED_ACTIVE, true, self.led.active.to_string());
+        publish_guaranteed(client, TOPIC_LED_IDLE, true, format!("{:?}", self.led.idle));
+        publish_guaranteed(
+            client,
+            TOPIC_LED_ACTIVE,
+            true,
+            format!("{:?}", self.led.active),
+        );
         publish_guaranteed(client, TOPIC_LED_BAND, true, self.led.band.to_string());
 
         // mqtt
@@ -208,14 +213,6 @@ pub fn handle_publish(
             cfg.prime = payload.trim().parse()?;
         }
 
-        // led
-        TOPIC_LED_IDLE => {
-            cfg.led.idle = payload.trim().parse()?;
-        }
-        TOPIC_LED_ACTIVE => {
-            cfg.led.active = payload.trim().parse()?;
-        }
-
         // left profile
         TOPIC_PROFILE_LEFT_SLEEP => {
             cfg.profile.unwrap_left_mut().sleep = payload.trim().parse()?;
@@ -270,8 +267,8 @@ pub fn handle_publish(
         }
 
         // RO
-        TOPIC_TIMEZONE | TOPIC_MQTT_SERVER | TOPIC_MQTT_PORT | TOPIC_MQTT_USER
-        | TOPIC_PROFILE_TYPE => {
+        TOPIC_TIMEZONE | TOPIC_MQTT_SERVER | TOPIC_MQTT_PORT | TOPIC_MQTT_USER | TOPIC_LED_IDLE
+        | TOPIC_LED_ACTIVE | TOPIC_PROFILE_TYPE => {
             return Err(format!("Publish to read-only config topic: {}", topic).into());
         }
 

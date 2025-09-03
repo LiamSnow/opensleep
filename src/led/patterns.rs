@@ -1,12 +1,10 @@
 use super::model::*;
 use serde::{Deserialize, Serialize};
-use strum_macros::{Display, EnumString};
 
 // plz make a PR if you find some more cool LED patterns!!
 // certainly a lot more room for expansion here
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Display, EnumString)]
-#[strum(serialize_all = "lowercase")]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum LedPattern {
     SlowBreath(u8, u8, u8),
     FastBreath(u8, u8, u8),
