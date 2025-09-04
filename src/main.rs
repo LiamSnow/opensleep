@@ -13,7 +13,7 @@ use tokio::sync::{mpsc, watch};
 
 use crate::{led::IS31FL3194Controller, mqtt::MqttManager, reset::ResetController};
 
-pub const VERSION: &str = "1.0.0";
+pub const VERSION: &str = "2.0.0";
 pub const NAME: &str = "opensleep";
 
 #[tokio::main]
