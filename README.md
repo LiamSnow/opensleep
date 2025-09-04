@@ -12,18 +12,18 @@ The Eight Sleep Pod 3 is temperature controlled mattress cover with sleep tracki
 Normally all raw sensor data is send to the cloud to be processed and converted into
  sleep tracking data. You view this data and control the mattress via the mobile app.
 
+The Pod 3 has a Varisite SOM running a minimal Yocto Musl Linux build. By adding other
+programs into this, you can control the bed with your own code. 
+
 ### How Other Projects Work
 Projects like [ninesleep](https://github.com/bobobo1618/ninesleep),
-[freesleep](https://github.com/throwaway31265/free-sleep), and this one all run programs
-on the Varisite SOM running a minimal Yocto Musl Linux build. Having your own firmware
-gives you some nice benefits like privacy (by not sending data to the cloud), more
-control over temp alarms etc, and allow you to add more features. 
-
-Frank then manages communication to two "subsystems" called "Sensor" (the STM32 on the
-sensor unit communicated by over USART via the USB cable) and "Frozen" (an onboard STM32
-for managing water pumps, TECs, solenoids, etc.). Capybara's purpose isn't entirely clear
-to me but its seems to handle initial Bluetooth setup along with I2C control of the LED
-controller and an IO expander for resetting and enabling Frozen.
+[freesleep](https://github.com/throwaway31265/free-sleep), and opensleep v1 all interact
+with Frank over a unix socket by pretending to be the DAC. Frank then manages
+communication to two "subsystems" called "Sensor" (the STM32 on the sensor unit communicated
+by over USART via the USB cable) and "Frozen" (an onboard STM32 for managing water pumps,
+TECs, solenoids, etc.). Capybara's purpose isn't entirely clear to me but its seems to
+handle initial Bluetooth setup along with I2C control of the LED controller and an IO
+expander for resetting and enabling Frozen. 
 
 Communicating directly with Frank lets you control all functionality of the Pod 3 BUT
 you are not able to get real-time sleep tracking data from it. Furthermore, Frank
