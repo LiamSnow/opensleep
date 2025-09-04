@@ -52,52 +52,75 @@ Download the `opensleep` binary from release page.
 ## MQTT Interface
 
 - `opensleep/`
-  - `presence/`: Person Presense Detection, All RO
-    - `in_bed`: `bool`
-    - `on_left`: `bool`
-    - `on_right`: `bool`
-  - `config/`: Published config from `config.ron`. Modifications will be saved back to `config.ron`. 
-    - `timezone`: RO `string`
-    - `away_mode`: RW `bool`
-    - `prime`: RW `time`
-    - `led/`
-      - `idle`: RO `LedPattern`
-      - `active`: RO `LedPattern`
-      - `band`: RO `CurrentBand`
-    - `mqtt/`
-      - `server`: RO `string`
-      - `port`: RO `u16`
-      - `user`: RO `string`
-    - `profile/` Profile type (`couples` or `solo`) may not be changed in runtime.
-      - `type`: RO `string` (`couples` or `solo`)
-      - `left/` and `right/` for couples, or `solo/` for solo
-        - `sleep`: RW `time`
-        - `wake`: RW `time`
-        - `temperatures`: RW `Vec<celcius>`
-        - `alarm/`: RW `AlarmConfig`
-    - `presence/`
-      - `baselines`: RW `[u16; 6]`
-      - `threshold`: RW `u16`
-      - `debounce_count`: RW `u8`
-  - `calibrate`: WO (triggers presense calibration, do not sit on the bed during this time)
-  - `sensor/` Sensor Subsystem Info, All RO
-    - `mode`: `DeviceMode`
-    - `hwinfo`: `HardwareInfo`
-    - `piezo_ok`: `bool`
-    - `vibration_enabled`: `bool`
-    - `bed_temp`: `[centcel; 6]`
-    - `ambient_temp`: `centcel`
-    - `humidity`: `u16`
-    - `mcu_temp`: `centcel`
-  - `frozen/`: Frozen Subsystem Info, All RO
-    - `mode`: `DeviceMode`
-    - `hwinfo`: `HardwareInfo`
-    - `left_temp`: `centcel` (left side water temperature)
-    - `right_temp`: `centcel`
-    - `heatsink_temp`: `centcel`
-    - `left_target_temp`: `centcel`|`disabled` (target left side water temperature)
-    - `right_target_temp`: `centcel`|`disabled`
 
+  - `availability`: `string` ("online")
+
+  - `device/`
+    - `name`: `string` ("opensleep")
+    - `version`: `string`
+    - `label`: `string` (ex. "20500-0000-F00-00001234")
+
+  - `state/`
+    - `presence/`: Person Presense Detection
+      - `any`: `bool`
+      - `left`: `bool`
+      - `right`: `bool`
+
+    - `sensor/` Sensor Subsystem Info
+      - `mode`: `DeviceMode`
+      - `hwinfo`: `HardwareInfo`
+      - `piezo_ok`: `bool`
+      - `vibration_enabled`: `bool`
+      - `bed_temp`: `[centidegrees_celcius; 6]`
+      - `ambient_temp`: `centidegrees_celcius`
+      - `humidity`: `u16`
+      - `mcu_temp`: `centidegrees_celcius`
+
+    - `frozen/`: Frozen Subsystem Info
+      - `mode`: `DeviceMode`
+      - `hwinfo`: `HardwareInfo`
+      - `left_temp`: `centidegrees_celcius` (left side water temperature)
+      - `right_temp`: `centidegrees_celcius`
+      - `heatsink_temp`: `centidegrees_celcius`
+      - `left_target_temp`: `centidegrees_celcius`|`disabled` (target left side water temperature)
+      - `right_target_temp`: `centidegrees_celcius`|`disabled`
+
+    - `config/`: Published config from `config.ron`. Modifications will be saved back to `config.ron`. 
+      - `timezone`: `string`
+      - `away_mode`: `bool`
+      - `prime`: `time`
+      - `led/`
+        - `idle`: `LedPattern`
+        - `active`: `LedPattern`
+        - `band`: `CurrentBand`
+      - `profile/`
+        - `type`: `string` ("couples" or "solo")
+        - `left/`, `right/` (solo mode only publishes to `left/`)
+          - `sleep`: `time`
+          - `wake`: `time`
+          - `temperatures`: `Vec<celcius>`
+          - `alarm/`: `AlarmConfig`
+      - `presence/`
+        - `baselines`: `[u16; 6]`
+        - `threshold`: `u16`
+        - `debounce_count`: `u8`
+
+  - `actions/` NOTE any changes to config here will be saved back to the `config.ron` file.
+    - `calibrate`: triggers presence calibration, do not sit on the bed during this time
+    - `set_away_mode` (`bool`): sets away mode config
+    - `set_prime` (`time`): sets time to prime
+    - `set_profile` (`TARGET.FIELD=VALUE`)
+      - `TARGET` must be `left` or `right` for couples mode or `both` for solo
+      - `FIELD` is one of `sleep`, `wake`, `temperatures`, `alarm`
+      - Ex: `left.sleep=20:30`
+    - `set_presence_config` (`FIELD=VALUE`)
+      - `FIELD` must be one of `baselines`, `threshold`, `debounce_count`
+      - Ex: `threshold=50`
+
+  - `result/`
+    - `action`: `string` (ex "set_away_mode")
+    - `status`: `string` ("success" or "error")
+    - `message`: `string`
   
 ### Types
 `time` is a zero-padding 24-hour time string. For example:
@@ -124,7 +147,7 @@ Download the `opensleep` binary from release page.
  - `Double,80,600,0`
  - `Single,20,600,0`
 
-`centcel` a u16 representing a temperature in centidegrees celcius IE `deg C * 100`
+`centidegrees_celcius` a u16 representing a temperature in centidegrees celcius IE `deg C * 100`
 
 `celcius` an f32 representing a temperature in degrees celcius
 

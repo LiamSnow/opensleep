@@ -6,20 +6,29 @@ mod mqtt;
 mod reset;
 mod sensor;
 
+use std::fs;
+
 use config::Config;
 use tokio::sync::{mpsc, watch};
 
 use crate::{led::IS31FL3194Controller, mqtt::MqttManager, reset::ResetController};
+
+pub const VERSION: &str = "1.0.0";
+pub const NAME: &str = "opensleep";
 
 #[tokio::main]
 pub async fn main() {
     env_logger::init();
     log::info!("Starting OpenSleep...");
 
-    let config = Config::load("config.ron").unwrap();
+    // read device label
+    let device_label =
+        fs::read_to_string("/home/dac/app/sewer/device-label").unwrap_or("unknown".to_string());
+
+    // read config
+    let config = Config::load("config.ron").await.unwrap();
     log::info!("`config.ron` loaded");
     let (config_tx, config_rx) = watch::channel(config.clone());
-
     log::info!(
         "Using timezone: {}",
         config.timezone.iana_name().unwrap_or("ERROR")
@@ -32,16 +41,15 @@ pub async fn main() {
 
     let (calibrate_tx, calibrate_rx) = mpsc::channel(32);
 
-    let mut mqtt_man = MqttManager::new(config_tx.clone(), config_rx.clone(), calibrate_tx);
+    let mut mqtt_man = MqttManager::new(
+        config_tx.clone(),
+        config_rx.clone(),
+        calibrate_tx,
+        device_label,
+    );
     mqtt_man.wait_for_conn().await;
 
-    config.publish(&mut mqtt_man.client);
-
     tokio::select! {
-        _ = tokio::signal::ctrl_c() => {
-            log::info!("Received ctrl+c signal");
-        }
-
         res = frozen::run(
             frozen::PORT,
             config_rx.clone(),

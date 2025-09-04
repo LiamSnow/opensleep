@@ -1,182 +1,180 @@
 use std::{borrow::Cow, error::Error};
 
-use crate::mqtt::publish_guaranteed;
+use crate::{
+    config::{PresenceConfig, SideConfig},
+    mqtt::publish_guaranteed_wait,
+};
 
 use super::{AlarmConfig, CONFIG_FILE, Config, SidesConfig};
+use jiff::civil::Time;
 use rumqttc::AsyncClient;
 use tokio::sync::watch;
 
-const TOPIC_TIMEZONE: &str = "opensleep/config/timezone";
-const TOPIC_AWAY_MODE: &str = "opensleep/config/away_mode";
-const TOPIC_PRIME_TIME: &str = "opensleep/config/prime_time";
+const TOPIC_TIMEZONE: &str = "opensleep/state/config/timezone";
+const TOPIC_AWAY_MODE: &str = "opensleep/state/config/away_mode";
+const TOPIC_PRIME: &str = "opensleep/state/config/prime";
 
-const TOPIC_LED_IDLE: &str = "opensleep/config/led/idle";
-const TOPIC_LED_ACTIVE: &str = "opensleep/config/led/active";
-const TOPIC_LED_BAND: &str = "opensleep/config/led/band";
+const TOPIC_LED_IDLE: &str = "opensleep/state/config/led/idle";
+const TOPIC_LED_ACTIVE: &str = "opensleep/state/config/led/active";
+const TOPIC_LED_BAND: &str = "opensleep/state/config/led/band";
 
-const TOPIC_MQTT_SERVER: &str = "opensleep/config/mqtt/server";
-const TOPIC_MQTT_PORT: &str = "opensleep/config/mqtt/port";
-const TOPIC_MQTT_USER: &str = "opensleep/config/mqtt/user";
+const TOPIC_PROFILE_TYPE: &str = "opensleep/state/config/profile/type";
 
-const TOPIC_PROFILE_TYPE: &str = "opensleep/config/profile/type";
+const TOPIC_PROFILE_LEFT_SLEEP: &str = "opensleep/state/config/profile/left/sleep";
+const TOPIC_PROFILE_LEFT_WAKE: &str = "opensleep/state/config/profile/left/wake";
+const TOPIC_PROFILE_LEFT_TEMPERATURES: &str = "opensleep/state/config/profile/left/temperatures";
+const TOPIC_PROFILE_LEFT_ALARM: &str = "opensleep/state/config/profile/left/alarm";
 
-const TOPIC_PROFILE_LEFT_SLEEP: &str = "opensleep/config/profile/left/sleep";
-const TOPIC_PROFILE_LEFT_WAKE: &str = "opensleep/config/profile/left/wake";
-const TOPIC_PROFILE_LEFT_TEMPERATURES: &str = "opensleep/config/profile/left/temperatures";
-const TOPIC_PROFILE_LEFT_ALARM: &str = "opensleep/config/profile/left/alarm";
+const TOPIC_PROFILE_RIGHT_SLEEP: &str = "opensleep/state/config/profile/right/sleep";
+const TOPIC_PROFILE_RIGHT_WAKE: &str = "opensleep/state/config/profile/right/wake";
+const TOPIC_PROFILE_RIGHT_TEMPERATURES: &str = "opensleep/state/config/profile/right/temperatures";
+const TOPIC_PROFILE_RIGHT_ALARM: &str = "opensleep/state/config/profile/right/alarm";
 
-const TOPIC_PROFILE_RIGHT_SLEEP: &str = "opensleep/config/profile/right/sleep";
-const TOPIC_PROFILE_RIGHT_WAKE: &str = "opensleep/config/profile/right/wake";
-const TOPIC_PROFILE_RIGHT_TEMPERATURES: &str = "opensleep/config/profile/right/temperatures";
-const TOPIC_PROFILE_RIGHT_ALARM: &str = "opensleep/config/profile/right/alarm";
+const TOPIC_PRESENCE_BASELINES: &str = "opensleep/state/config/presence/baselines";
+const TOPIC_PRESENCE_THRESHOLD: &str = "opensleep/state/config/presence/threshold";
+const TOPIC_PRESENCE_DEBOUNCE_COUNT: &str = "opensleep/state/config/presence/debounce_count";
 
-const TOPIC_PROFILE_SOLO_SLEEP: &str = "opensleep/config/profile/solo/sleep";
-const TOPIC_PROFILE_SOLO_WAKE: &str = "opensleep/config/profile/solo/wake";
-const TOPIC_PROFILE_SOLO_TEMPERATURES: &str = "opensleep/config/profile/solo/temperatures";
-const TOPIC_PROFILE_SOLO_ALARM: &str = "opensleep/config/profile/solo/alarm";
+pub const TOPIC_SET_AWAY_MODE: &str = "opensleep/actions/set_away_mode";
+pub const TOPIC_SET_PRIME: &str = "opensleep/actions/set_prime";
+pub const TOPIC_SET_PROFILE: &str = "opensleep/actions/set_profile";
+pub const TOPIC_SET_PRESENCE: &str = "opensleep/actions/set_presence_config";
 
-const TOPIC_PRESENCE_BASELINES: &str = "opensleep/config/presence/baselines";
-const TOPIC_PRESENCE_THRESHOLD: &str = "opensleep/config/presence/threshold";
-const TOPIC_PRESENCE_DEBOUNCE_COUNT: &str = "opensleep/config/presence/debounce_count";
-
-impl Config {
-    pub fn publish(&self, client: &mut AsyncClient) {
-        publish_guaranteed(
+impl PresenceConfig {
+    async fn publish(&self, client: &mut AsyncClient) {
+        publish_guaranteed_wait(
             client,
-            TOPIC_TIMEZONE,
+            TOPIC_PRESENCE_BASELINES,
             true,
-            self.timezone.iana_name().unwrap_or("ERROR"),
-        );
+            self.baselines
+                .iter()
+                .map(|e| e.to_string())
+                .collect::<Vec<_>>()
+                .join(","),
+        )
+        .await;
 
-        publish_guaranteed(client, TOPIC_AWAY_MODE, true, self.away_mode.to_string());
-
-        publish_guaranteed(client, TOPIC_PRIME_TIME, true, self.prime.to_string());
-
-        // led
-        publish_guaranteed(client, TOPIC_LED_IDLE, true, format!("{:?}", self.led.idle));
-        publish_guaranteed(
+        publish_guaranteed_wait(
             client,
-            TOPIC_LED_ACTIVE,
+            TOPIC_PRESENCE_THRESHOLD,
             true,
-            format!("{:?}", self.led.active),
-        );
-        publish_guaranteed(client, TOPIC_LED_BAND, true, self.led.band.to_string());
-
-        // mqtt
-        publish_guaranteed(
+            self.threshold.to_string(),
+        )
+        .await;
+        publish_guaranteed_wait(
             client,
-            TOPIC_MQTT_SERVER,
+            TOPIC_PRESENCE_DEBOUNCE_COUNT,
             true,
-            self.mqtt.server.to_string(),
-        );
-        publish_guaranteed(client, TOPIC_MQTT_PORT, true, self.mqtt.port.to_string());
-        publish_guaranteed(client, TOPIC_MQTT_USER, true, self.mqtt.user.to_string());
+            self.debounce_count.to_string(),
+        )
+        .await;
+    }
+}
 
-        // presence
-        if let Some(presence) = &self.presence {
-            publish_guaranteed(
-                client,
-                TOPIC_PRESENCE_BASELINES,
-                true,
-                presence
-                    .baselines
-                    .iter()
-                    .map(|e| e.to_string())
-                    .collect::<Vec<_>>()
-                    .join(","),
-            );
-
-            publish_guaranteed(
-                client,
-                TOPIC_PRESENCE_THRESHOLD,
-                true,
-                presence.threshold.to_string(),
-            );
-            publish_guaranteed(
-                client,
-                TOPIC_PRESENCE_DEBOUNCE_COUNT,
-                true,
-                presence.debounce_count.to_string(),
-            );
-        }
-
-        match &self.profile {
+impl SidesConfig {
+    async fn publish(&self, client: &mut AsyncClient) {
+        match &self {
             SidesConfig::Solo(solo) => {
-                publish_guaranteed(client, TOPIC_PROFILE_TYPE, true, "solo");
-
-                publish_guaranteed(
-                    client,
-                    TOPIC_PROFILE_SOLO_SLEEP,
-                    true,
-                    solo.sleep.to_string(),
-                );
-                publish_guaranteed(client, TOPIC_PROFILE_SOLO_WAKE, true, solo.wake.to_string());
-                publish_guaranteed(
-                    client,
-                    TOPIC_PROFILE_SOLO_TEMPERATURES,
-                    true,
-                    temps_to_string(&solo.temperatures),
-                );
-                publish_guaranteed(
-                    client,
-                    TOPIC_PROFILE_SOLO_ALARM,
-                    true,
-                    alarm_to_string(&solo.alarm),
-                );
+                publish_guaranteed_wait(client, TOPIC_PROFILE_TYPE, true, "solo").await;
+                publish_left_profile(client, solo).await;
             }
             SidesConfig::Couples { left, right } => {
-                publish_guaranteed(client, TOPIC_PROFILE_TYPE, true, "couples");
+                publish_guaranteed_wait(client, TOPIC_PROFILE_TYPE, true, "couples").await;
 
-                publish_guaranteed(
-                    client,
-                    TOPIC_PROFILE_LEFT_SLEEP,
-                    true,
-                    left.sleep.to_string(),
-                );
-                publish_guaranteed(client, TOPIC_PROFILE_LEFT_WAKE, true, left.wake.to_string());
-                publish_guaranteed(
-                    client,
-                    TOPIC_PROFILE_LEFT_TEMPERATURES,
-                    true,
-                    temps_to_string(&left.temperatures),
-                );
-                publish_guaranteed(
-                    client,
-                    TOPIC_PROFILE_LEFT_ALARM,
-                    true,
-                    alarm_to_string(&left.alarm),
-                );
+                publish_left_profile(client, left).await;
 
-                publish_guaranteed(
+                publish_profile(
                     client,
+                    right,
                     TOPIC_PROFILE_RIGHT_SLEEP,
-                    true,
-                    right.sleep.to_string(),
-                );
-                publish_guaranteed(
-                    client,
                     TOPIC_PROFILE_RIGHT_WAKE,
-                    true,
-                    right.wake.to_string(),
-                );
-                publish_guaranteed(
-                    client,
                     TOPIC_PROFILE_RIGHT_TEMPERATURES,
-                    true,
-                    temps_to_string(&right.temperatures),
-                );
-                publish_guaranteed(
-                    client,
                     TOPIC_PROFILE_RIGHT_ALARM,
-                    true,
-                    alarm_to_string(&right.alarm),
-                );
+                )
+                .await;
             }
         }
     }
 }
 
-pub fn handle_publish(
+impl Config {
+    pub async fn publish(&self, client: &mut AsyncClient) {
+        log::debug!("Publishing config..");
+        publish_guaranteed_wait(
+            client,
+            TOPIC_TIMEZONE,
+            true,
+            self.timezone.iana_name().unwrap_or("ERROR"),
+        )
+        .await;
+
+        publish_away_mode(client, self.away_mode).await;
+
+        publish_prime(client, self.prime).await;
+
+        // led
+        publish_guaranteed_wait(client, TOPIC_LED_IDLE, true, format!("{:?}", self.led.idle)).await;
+        publish_guaranteed_wait(
+            client,
+            TOPIC_LED_ACTIVE,
+            true,
+            format!("{:?}", self.led.active),
+        )
+        .await;
+        publish_guaranteed_wait(client, TOPIC_LED_BAND, true, self.led.band.to_string()).await;
+
+        // presence
+        if let Some(presence) = &self.presence {
+            presence.publish(client).await;
+        }
+
+        self.profile.publish(client).await;
+
+        log::debug!("Published config");
+    }
+}
+
+async fn publish_prime(client: &mut AsyncClient, value: Time) {
+    publish_guaranteed_wait(client, TOPIC_PRIME, true, value.to_string()).await;
+}
+
+async fn publish_away_mode(client: &mut AsyncClient, mode: bool) {
+    publish_guaranteed_wait(client, TOPIC_AWAY_MODE, true, mode.to_string()).await;
+}
+
+async fn publish_left_profile(client: &mut AsyncClient, side: &SideConfig) {
+    publish_profile(
+        client,
+        side,
+        TOPIC_PROFILE_LEFT_SLEEP,
+        TOPIC_PROFILE_LEFT_WAKE,
+        TOPIC_PROFILE_LEFT_TEMPERATURES,
+        TOPIC_PROFILE_LEFT_ALARM,
+    )
+    .await;
+}
+
+async fn publish_profile(
+    client: &mut AsyncClient,
+    side: &SideConfig,
+    topic_sleep: &'static str,
+    topic_wake: &'static str,
+    topic_temps: &'static str,
+    topic_alarm: &'static str,
+) {
+    publish_guaranteed_wait(client, topic_sleep, true, side.sleep.to_string()).await;
+    publish_guaranteed_wait(client, topic_wake, true, side.wake.to_string()).await;
+    publish_guaranteed_wait(
+        client,
+        topic_temps,
+        true,
+        temps_to_string(&side.temperatures),
+    )
+    .await;
+    publish_guaranteed_wait(client, topic_alarm, true, alarm_to_string(&side.alarm)).await;
+}
+
+pub async fn handle_action(
+    client: &mut AsyncClient,
     topic: &str,
     payload: Cow<'_, str>,
     config_tx: &mut watch::Sender<Config>,
@@ -184,95 +182,105 @@ pub fn handle_publish(
 ) -> Result<(), Box<dyn Error>> {
     let mut cfg = config_rx.borrow().clone();
 
-    // verification
-    if topic.starts_with("opensleep/config/profile/right")
-        || topic.starts_with("opensleep/config/profile/left") && cfg.profile.is_solo()
-    {
-        return Err("Publish to `couples` profile, but profile is in `solo` mode. Please edit the config.ron file and restart opensleep.".into());
-    }
-
-    if topic.starts_with("opensleep/config/profile/solo") && cfg.profile.is_couples() {
-        return Err(
-            "Publish to `solo` profile, but profile is in `couples` mode. Please edit the config.ron file and restart opensleep.".into()
-        );
-    }
-
-    if topic.starts_with("opensleep/config/presence") && cfg.presence.is_none() {
-        return Err(
-            "Publish to `presence` config, but no presence exists. Please calibrate first!".into(),
-        );
-    }
-
     // modify config
     match topic {
-        TOPIC_AWAY_MODE => {
+        TOPIC_SET_AWAY_MODE => {
             cfg.away_mode = payload.trim().parse()?;
+            log::info!("Set away_mode to {}", cfg.away_mode);
+            publish_away_mode(client, cfg.away_mode).await;
         }
 
-        TOPIC_PRIME_TIME => {
+        TOPIC_SET_PRIME => {
             cfg.prime = payload.trim().parse()?;
+            log::info!("Set prime time to {}", cfg.prime);
+            publish_prime(client, cfg.prime).await;
         }
 
-        // left profile
-        TOPIC_PROFILE_LEFT_SLEEP => {
-            cfg.profile.unwrap_left_mut().sleep = payload.trim().parse()?;
-        }
-        TOPIC_PROFILE_LEFT_WAKE => {
-            cfg.profile.unwrap_left_mut().wake = payload.trim().parse()?;
-        }
-        TOPIC_PROFILE_LEFT_TEMPERATURES => {
-            cfg.profile.unwrap_left_mut().temperatures = parse_temperatures(&payload)?;
-        }
-        TOPIC_PROFILE_LEFT_ALARM => {
-            cfg.profile.unwrap_left_mut().alarm = parse_alarm(&payload)?;
+        TOPIC_SET_PROFILE => {
+            // TARGET.FIELD=VALUE
+            let (target, rhs) = payload
+                .trim()
+                .split_once('.')
+                .ok_or("Invalid input. Requires `TARGET.FIELD=VALUE`")?;
+
+            let (field, value) = rhs
+                .trim()
+                .split_once('=')
+                .ok_or("Invalid input. Requires `TARGET.FIELD=VALUE`")?;
+
+            if ["left", "right"].contains(&target) && cfg.profile.is_solo() {
+                return Err(
+                    "Cannot modify profile in `couples` mode (currently in `solo` mode)".into(),
+                );
+            }
+
+            let profile = match target {
+                "left" => cfg.profile.unwrap_left_mut(),
+                "right" => cfg.profile.unwrap_right_mut(),
+                "both" => {
+                    if cfg.profile.is_couples() {
+                        return Err(
+                            "Cannot modify profile in `solo` mode (currently in `couples` mode)"
+                                .into(),
+                        );
+                    }
+
+                    cfg.profile.unwrap_solo_mut()
+                }
+                _ => return Err("Invalid TARGET. Must be `left`, `right`, or `both`".into()),
+            };
+
+            match field {
+                "sleep" => {
+                    profile.sleep = value.parse()?;
+                }
+                "wake" => {
+                    profile.wake = value.parse()?;
+                }
+                "temperatures" => {
+                    profile.temperatures = parse_temperatures(value)?;
+                }
+                "alarm" => {
+                    profile.alarm = parse_alarm(value)?;
+                }
+                _ => {
+                    return Err(
+                        "Invalid FIELD. Must be `sleep`, `wake`, `temperatures`, or `alarm`".into(),
+                    );
+                }
+            }
+
+            log::info!("Updated profile ({target}::{field} -> {value})");
+            cfg.profile.publish(client).await;
         }
 
-        // right profile
-        TOPIC_PROFILE_RIGHT_SLEEP => {
-            cfg.profile.unwrap_right_mut().sleep = payload.trim().parse()?;
-        }
-        TOPIC_PROFILE_RIGHT_WAKE => {
-            cfg.profile.unwrap_right_mut().wake = payload.trim().parse()?;
-        }
-        TOPIC_PROFILE_RIGHT_TEMPERATURES => {
-            cfg.profile.unwrap_right_mut().temperatures = parse_temperatures(&payload)?;
-        }
-        TOPIC_PROFILE_RIGHT_ALARM => {
-            cfg.profile.unwrap_right_mut().alarm = parse_alarm(&payload)?;
+        TOPIC_SET_PRESENCE => {
+            if cfg.presence.is_none() {
+                return Err("Cannot modify non-existant presense configuration. Please call `actions/calibrate` first!".into());
+            }
+
+            let (field, value) = payload
+                .trim()
+                .split_once('=')
+                .ok_or("Invalid input. Requires `FIELD=VALUE`")?;
+
+            match field {
+                "baselines" => {
+                    cfg.presence.as_mut().unwrap().baselines = parse_baselines(value)?;
+                }
+                "threshold" => {
+                    cfg.presence.as_mut().unwrap().threshold = value.trim().parse()?;
+                }
+                "debounce_count" => {
+                    cfg.presence.as_mut().unwrap().debounce_count = value.trim().parse()?;
+                }
+                _ => return Err("Unknown field".into()),
+            }
+
+            log::info!("Update presence config ({field} -> {value})");
+            cfg.presence.as_ref().unwrap().publish(client).await;
         }
 
-        // solo profile
-        TOPIC_PROFILE_SOLO_SLEEP => {
-            cfg.profile.unwrap_solo_mut().sleep = payload.trim().parse()?;
-        }
-        TOPIC_PROFILE_SOLO_WAKE => {
-            cfg.profile.unwrap_solo_mut().wake = payload.trim().parse()?;
-        }
-        TOPIC_PROFILE_SOLO_TEMPERATURES => {
-            cfg.profile.unwrap_solo_mut().temperatures = parse_temperatures(&payload)?;
-        }
-        TOPIC_PROFILE_SOLO_ALARM => {
-            cfg.profile.unwrap_solo_mut().alarm = parse_alarm(&payload)?;
-        }
-
-        // presence
-        TOPIC_PRESENCE_BASELINES => {
-            cfg.presence.as_mut().unwrap().baselines = parse_baselines(&payload)?;
-        }
-        TOPIC_PRESENCE_THRESHOLD => {
-            cfg.presence.as_mut().unwrap().threshold = payload.trim().parse()?;
-        }
-        TOPIC_PRESENCE_DEBOUNCE_COUNT => {
-            cfg.presence.as_mut().unwrap().debounce_count = payload.trim().parse()?;
-        }
-
-        // RO
-        TOPIC_TIMEZONE | TOPIC_MQTT_SERVER | TOPIC_MQTT_PORT | TOPIC_MQTT_USER | TOPIC_LED_IDLE
-        | TOPIC_LED_ACTIVE | TOPIC_PROFILE_TYPE => {
-            return Err(format!("Publish to read-only config topic: {}", topic).into());
-        }
-
-        // unknown
         topic => {
             return Err(format!("Publish to unknown config topic: {topic}").into());
         }
@@ -284,23 +292,24 @@ pub fn handle_publish(
     }
 
     // save to file
-    if let Err(e) = cfg.save(CONFIG_FILE) {
+    if let Err(e) = cfg.save(CONFIG_FILE).await {
         return Err(format!("Failed to save config: {e}").into());
     }
     log::debug!("Config saved to disk");
+
     Ok(())
 }
 
-fn parse_temperatures(payload: &str) -> Result<Vec<f32>, String> {
-    payload
+fn parse_temperatures(value: &str) -> Result<Vec<f32>, String> {
+    value
         .trim()
         .split(',')
         .map(|s| s.trim().parse::<f32>().map_err(|e| e.to_string()))
         .collect()
 }
 
-fn parse_alarm(payload: &str) -> Result<Option<AlarmConfig>, String> {
-    let trimmed = payload.trim();
+fn parse_alarm(value: &str) -> Result<Option<AlarmConfig>, String> {
+    let trimmed = value.trim();
 
     if trimmed == "disabled" {
         return Ok(None);
@@ -339,8 +348,8 @@ fn parse_alarm(payload: &str) -> Result<Option<AlarmConfig>, String> {
     }))
 }
 
-fn parse_baselines(payload: &str) -> Result<[u16; 6], String> {
-    let values: Result<Vec<u16>, _> = payload
+fn parse_baselines(value: &str) -> Result<[u16; 6], String> {
+    let values: Result<Vec<u16>, _> = value
         .trim()
         .split(',')
         .map(|s| s.trim().parse::<u16>().map_err(|e| e.to_string()))
@@ -359,6 +368,7 @@ fn parse_baselines(payload: &str) -> Result<[u16; 6], String> {
         values[0], values[1], values[2], values[3], values[4], values[5],
     ])
 }
+
 fn alarm_to_string(alarm: &Option<AlarmConfig>) -> String {
     match alarm {
         Some(a) => {

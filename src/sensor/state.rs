@@ -5,7 +5,7 @@ use crate::{
         packet::{BedSide, HardwareInfo},
         serial::DeviceMode,
     },
-    mqtt::{publish_guaranteed, publish_high_freq},
+    mqtt::{publish_guaranteed_wait, publish_high_freq},
     sensor::packet::SensorPacket,
 };
 
@@ -25,14 +25,14 @@ pub const PIEZO_GAIN: u16 = 400;
 const PIEZO_TOLERANCE: i16 = 6;
 pub const PIEZO_FREQ: u32 = 1000;
 
-const TOPIC_MODE: &str = "opensleep/sensor/mode";
-const TOPIC_HWINFO: &str = "opensleep/sensor/hwinfo";
-const TOPIC_PIEZO_OK: &str = "opensleep/sensor/piezo_ok";
-const TOPIC_VIBRATION_ENABLED: &str = "opensleep/sensor/vibration_enabled";
-const TOPIC_BED_TEMP: &str = "opensleep/sensor/bed_temp";
-const TOPIC_AMBIENT_TEMP: &str = "opensleep/sensor/ambient_temp";
-const TOPIC_HUMIDITY: &str = "opensleep/sensor/humidity";
-const TOPIC_MCU_TEMP: &str = "opensleep/sensor/mcu_temp";
+const TOPIC_MODE: &str = "opensleep/state/sensor/mode";
+const TOPIC_HWINFO: &str = "opensleep/state/sensor/hwinfo";
+const TOPIC_PIEZO_OK: &str = "opensleep/state/sensor/piezo_ok";
+const TOPIC_VIBRATION_ENABLED: &str = "opensleep/state/sensor/vibration_enabled";
+const TOPIC_BED_TEMP: &str = "opensleep/state/sensor/bed_temp";
+const TOPIC_AMBIENT_TEMP: &str = "opensleep/state/sensor/ambient_temp";
+const TOPIC_HUMIDITY: &str = "opensleep/state/sensor/humidity";
+const TOPIC_MCU_TEMP: &str = "opensleep/state/sensor/mcu_temp";
 
 impl SensorState {
     pub fn piezo_gain_ok(&self) -> bool {
@@ -53,13 +53,13 @@ impl SensorState {
         self.piezo_enabled && self.piezo_gain_ok() && self.piezo_freq_ok()
     }
 
-    pub fn set_device_mode(&mut self, client: &mut AsyncClient, mode: DeviceMode) {
+    pub async fn set_device_mode(&mut self, client: &mut AsyncClient, mode: DeviceMode) {
         let prev = self.device_mode;
         self.device_mode = mode;
 
         if prev != mode {
             log::info!("Device mode: {prev:?} -> {mode:?}");
-            publish_guaranteed(client, TOPIC_MODE, false, mode.to_string());
+            publish_guaranteed_wait(client, TOPIC_MODE, false, mode.to_string()).await;
         }
     }
 
@@ -70,8 +70,8 @@ impl SensorState {
         }
     }
 
-    fn publish_piezo_ok(&self, client: &mut AsyncClient) {
-        publish_guaranteed(client, TOPIC_PIEZO_OK, false, self.piezo_ok().to_string());
+    async fn publish_piezo_ok(&self, client: &mut AsyncClient) {
+        publish_guaranteed_wait(client, TOPIC_PIEZO_OK, false, self.piezo_ok().to_string()).await;
     }
 
     /// [%s] off
@@ -121,19 +121,20 @@ impl SensorState {
         }
     }
 
-    pub fn handle_packet(&mut self, client: &mut AsyncClient, packet: SensorPacket) {
+    pub async fn handle_packet(&mut self, client: &mut AsyncClient, packet: SensorPacket) {
         match packet {
             SensorPacket::Pong(in_firmware) => {
-                self.set_device_mode(client, DeviceMode::from_pong(in_firmware));
+                self.set_device_mode(client, DeviceMode::from_pong(in_firmware))
+                    .await;
             }
             SensorPacket::HardwareInfo(info) => {
                 log::info!("Hardware info: {info}");
-                publish_guaranteed(client, TOPIC_HWINFO, true, info.to_string());
+                publish_guaranteed_wait(client, TOPIC_HWINFO, true, info.to_string()).await;
                 self.hardware_info = Some(info);
             }
             SensorPacket::JumpingToFirmware(code) => {
                 log::debug!("Jumping to firmware with code: 0x{code:02X}");
-                self.set_device_mode(client, DeviceMode::Firmware);
+                self.set_device_mode(client, DeviceMode::Firmware).await;
             }
             SensorPacket::Message(msg) => {
                 if let Some(stripped) = msg.strip_prefix("FW: alarm") {
@@ -144,17 +145,17 @@ impl SensorState {
             }
             SensorPacket::PiezoGainSet(l, r) => {
                 log::info!("Piezo Gain Set: {l},{r}");
-                self.publish_piezo_ok(client);
+                self.publish_piezo_ok(client).await;
                 self.piezo_gain = Some((l, r));
             }
             SensorPacket::PiezoEnabled(val) => {
                 log::info!("Piezo Enabled {val:02X}");
-                self.publish_piezo_ok(client);
+                self.publish_piezo_ok(client).await;
                 self.piezo_enabled = true;
             }
             SensorPacket::VibrationEnabled(_, _) => {
                 log::info!("Vibration Enabled");
-                publish_guaranteed(client, TOPIC_VIBRATION_ENABLED, false, "true");
+                publish_guaranteed_wait(client, TOPIC_VIBRATION_ENABLED, false, "true").await;
                 self.vibration_enabled = true;
             }
             SensorPacket::Capacitance(_) => {}
@@ -182,7 +183,7 @@ impl SensorState {
                     self.piezo_freq = Some(u.freq);
                 }
                 if gain_changed || freq_changed || enabled_changed {
-                    self.publish_piezo_ok(client);
+                    self.publish_piezo_ok(client).await;
                 }
             }
             SensorPacket::AlarmSet(v) => {

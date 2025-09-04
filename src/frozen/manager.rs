@@ -66,7 +66,7 @@ pub async fn run(
         tokio::select! {
             Some(result) = reader.next() => match result {
                 Ok(packet) => {
-                    state.handle_packet(&mut client, packet);
+                    state.handle_packet(&mut client, packet).await;
 
                     if state.is_active() != was_active {
                         if was_active {

@@ -9,15 +9,16 @@ const DEFAULT_THRESHOLD: u16 = 50;
 const DEFAULT_DEBOUNCE: u8 = 5;
 const CALIBRATION_DURATION: Duration = Duration::from_secs(10);
 
-const TOPIC_IN_BED: &str = "opensleep/presence/in_bed";
-const TOPIC_ON_LEFT: &str = "opensleep/presence/on_left";
-const TOPIC_ON_RIGHT: &str = "opensleep/presence/on_right";
+const TOPIC_ANY: &str = "opensleep/state/presence/any";
+const TOPIC_LEFT: &str = "opensleep/state/presence/left";
+const TOPIC_RIGHT: &str = "opensleep/state/presence/right";
+pub const TOPIC_CALIBRATE: &str = "opensleep/action/calibrate";
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct PresenceState {
-    pub in_bed: bool,
-    pub on_left: bool,
-    pub on_right: bool,
+    pub any: bool,
+    pub left: bool,
+    pub right: bool,
 }
 
 pub struct PresenseManager {
@@ -28,6 +29,7 @@ pub struct PresenseManager {
     calibration_end: Option<Instant>,
     calibration_samples: Vec<[u16; 6]>,
     debounce: [u8; 6],
+    last_state: Option<PresenceState>,
 }
 
 impl PresenseManager {
@@ -52,6 +54,7 @@ impl PresenseManager {
             calibration_end: None,
             calibration_samples: Vec::new(),
             debounce: [0u8; 6],
+            last_state: None,
         }
     }
 
@@ -84,18 +87,21 @@ impl PresenseManager {
             .any(|&c| c >= config.debounce_count);
 
         let state = PresenceState {
-            in_bed: left_present || right_present,
-            on_left: left_present,
-            on_right: right_present,
+            any: left_present || right_present,
+            left: left_present,
+            right: right_present,
         };
 
-        self.update_mqtt(&state);
+        if self.last_state.as_ref() != Some(&state) {
+            self.update_mqtt(&state);
+            self.last_state = Some(state);
+        }
     }
 
     fn update_mqtt(&mut self, state: &PresenceState) {
-        publish_high_freq(&mut self.client, TOPIC_IN_BED, state.in_bed.to_string());
-        publish_high_freq(&mut self.client, TOPIC_ON_LEFT, state.on_left.to_string());
-        publish_high_freq(&mut self.client, TOPIC_ON_RIGHT, state.on_right.to_string());
+        publish_high_freq(&mut self.client, TOPIC_ANY, state.any.to_string());
+        publish_high_freq(&mut self.client, TOPIC_LEFT, state.left.to_string());
+        publish_high_freq(&mut self.client, TOPIC_RIGHT, state.right.to_string());
     }
 
     pub fn start_calibration(&mut self) {

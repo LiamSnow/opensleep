@@ -71,7 +71,7 @@ pub async fn run(
                         presense_man.update(data);
                     }
 
-                    state.handle_packet(&mut client, packet);
+                    state.handle_packet(&mut client, packet).await;
                 }
                 Err(e) => {
                     log::error!("Packet decode error: {e}");
@@ -309,8 +309,8 @@ async fn ping_device(
             .map_err(|e| SerialError::Io(std::io::Error::other(e)))?;
 
         if let Ok(Some(Ok(packet))) = timeout(Duration::from_millis(500), reader.next()).await {
-            state.set_device_mode(client, mode);
-            state.handle_packet(client, packet);
+            state.set_device_mode(client, mode).await;
+            state.handle_packet(client, packet).await;
             return Ok((writer, reader));
         }
     }
@@ -339,7 +339,7 @@ async fn wait_for_mode(
         }
 
         if let Some(Ok(packet)) = reader.next().await {
-            state.handle_packet(client, packet);
+            state.handle_packet(client, packet).await;
         }
     }
 

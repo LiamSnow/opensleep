@@ -1,8 +1,8 @@
 use jiff::{civil::Time, tz::TimeZone};
 use ron::extensions::Extensions;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::fs;
 use thiserror::Error;
+use tokio::fs;
 
 use crate::common::packet::BedSide;
 use crate::led::{CurrentBand, LedPattern};
@@ -104,17 +104,17 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load(path: &str) -> Result<Self, ConfigError> {
-        let content = fs::read_to_string(path)?;
+    pub async fn load(path: &str) -> Result<Self, ConfigError> {
+        let content = fs::read_to_string(path).await?;
         let opts = ron::Options::default().with_default_extension(Extensions::IMPLICIT_SOME);
         let config = opts.from_str(&content)?;
         Ok(config)
     }
 
-    pub fn save(&self, path: &str) -> Result<(), ConfigError> {
+    pub async fn save(&self, path: &str) -> Result<(), ConfigError> {
         let content = ron::ser::to_string_pretty(self, ron::ser::PrettyConfig::default())
             .map_err(|e| ConfigError::Io(std::io::Error::other(e)))?;
-        fs::write(path, content)?;
+        fs::write(path, content).await?;
         Ok(())
     }
 }

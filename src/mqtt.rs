@@ -1,7 +1,30 @@
-use crate::config::{self, Config};
+use crate::{
+    NAME, VERSION,
+    config::{
+        self, Config,
+        mqtt::{TOPIC_SET_AWAY_MODE, TOPIC_SET_PRESENCE, TOPIC_SET_PRIME, TOPIC_SET_PROFILE},
+    },
+    sensor::presence::TOPIC_CALIBRATE,
+};
 use rumqttc::{AsyncClient, ConnectionError, Event, EventLoop, MqttOptions, Packet, Publish, QoS};
 use std::{fmt::Display, time::Duration};
-use tokio::sync::{mpsc, watch};
+use tokio::{
+    sync::{mpsc, watch},
+    time::timeout,
+};
+
+const TOPIC_AVAILABILITY: &str = "opensleep/availability";
+
+const TOPIC_DEVICE_NAME: &str = "opensleep/device/name";
+const TOPIC_DEVICE_VERSION: &str = "opensleep/device/version";
+const TOPIC_DEVICE_LABEL: &str = "opensleep/device/label";
+
+const TOPIC_RESULT_ACTION: &str = "opensleep/result/action";
+const TOPIC_RESULT_STATUS: &str = "opensleep/result/status";
+const TOPIC_RESULT_MSG: &str = "opensleep/result/message";
+
+const SUCCESS: &str = "success";
+const ERROR: &str = "error";
 
 pub struct MqttManager {
     config_tx: watch::Sender<Config>,
@@ -9,6 +32,7 @@ pub struct MqttManager {
     calibrate_tx: mpsc::Sender<()>,
     pub client: AsyncClient,
     eventloop: EventLoop,
+    device_label: String,
 }
 
 impl MqttManager {
@@ -16,6 +40,7 @@ impl MqttManager {
         config_tx: watch::Sender<Config>,
         config_rx: watch::Receiver<Config>,
         calibrate_tx: mpsc::Sender<()>,
+        device_label: String,
     ) -> Self {
         log::info!("Initializing MQTT...");
 
@@ -40,32 +65,59 @@ impl MqttManager {
             calibrate_tx,
             client,
             eventloop,
+            device_label,
         }
     }
 
     pub async fn wait_for_conn(&mut self) {
         loop {
-            let msg = self.eventloop.poll().await;
-            if self.handle_msg(msg).await {
+            let evt = self.eventloop.poll().await;
+            if self.handle_event(evt).await {
                 return;
             }
         }
     }
 
+    async fn subscribe_actions(&mut self) {
+        subscribe(&mut self.client, TOPIC_CALIBRATE).await;
+        subscribe(&mut self.client, TOPIC_SET_AWAY_MODE).await;
+        subscribe(&mut self.client, TOPIC_SET_PRIME).await;
+        subscribe(&mut self.client, TOPIC_SET_PROFILE).await;
+        subscribe(&mut self.client, TOPIC_SET_PRESENCE).await;
+    }
+
+    /// this must be in its own task because publishing
+    /// topics requires someone polling the event loop
+    async fn spawn_publish_task(&mut self) {
+        let config = {
+            let c = self.config_rx.borrow();
+            c.clone()
+        };
+        let mut client = self.client.clone();
+        let device_label = self.device_label.clone();
+        tokio::spawn(async move {
+            config.publish(&mut client).await;
+            publish_guaranteed_wait(&mut client, TOPIC_AVAILABILITY, false, "online").await;
+            publish_guaranteed_wait(&mut client, TOPIC_DEVICE_NAME, false, NAME).await;
+            publish_guaranteed_wait(&mut client, TOPIC_DEVICE_VERSION, false, VERSION).await;
+            publish_guaranteed_wait(&mut client, TOPIC_DEVICE_LABEL, false, device_label).await;
+        });
+    }
+
     /// returns true if connected
-    async fn handle_msg(&mut self, msg: Result<Event, ConnectionError>) -> bool {
+    async fn handle_event(&mut self, msg: Result<Event, ConnectionError>) -> bool {
         match msg {
             Ok(Event::Incoming(Packet::ConnAck(_))) => {
                 log::info!("MQTT broker connected");
-                self.subscribe("opensleep/config/+").await;
-                self.subscribe("opensleep/calibrate").await;
+                self.subscribe_actions().await;
+                self.spawn_publish_task().await;
                 return true;
             }
             Ok(Event::Incoming(Packet::Disconnect)) => {
                 log::warn!("MQTT broker disconnected");
             }
             Ok(Event::Incoming(Packet::Publish(publ))) => {
-                self.handle_publ(publ);
+                self.handle_action(publ).await;
             }
             Ok(_) => {}
             Err(e) => {
@@ -77,63 +129,94 @@ impl MqttManager {
 
     pub async fn run(mut self) {
         loop {
-            let msg = self.eventloop.poll().await;
-            self.handle_msg(msg).await;
+            let evt = self.eventloop.poll().await;
+            self.handle_event(evt).await;
         }
     }
 
-    fn handle_publ(&mut self, publ: Publish) {
-        if publ.topic == "opensleep/calibrate" {
+    async fn handle_action(&mut self, publ: Publish) {
+        if publ.topic == TOPIC_CALIBRATE {
             if let Err(e) = self.calibrate_tx.try_send(()) {
-                log::error!("Failed to send to calibrate channel: {e}");
+                let msg = format!("Failed to send to calibrate channel: {e}");
+                log::error!("{msg}");
+                self.publish_result("calibrate", ERROR, msg).await;
+            } else {
+                self.publish_result("calibrate", SUCCESS, "started calibration".to_string())
+                    .await;
             }
-        } else if publ.topic.starts_with("opensleep/config") {
-            let topic = publ.topic.clone();
-            let payload = String::from_utf8_lossy(&publ.payload);
-            if let Err(e) = config::mqtt::handle_publish(
-                &topic,
-                payload.clone(),
-                &mut self.config_tx,
-                &mut self.config_rx,
-            ) {
-                log::error!(
-                    "Error updating config on topic `{topic}` with payload `{payload}`: {e}"
-                );
-            }
+        } else if publ.topic.starts_with("opensleep/actions/set_") {
+            self.handle_set_action(publ).await;
         } else {
-            log::warn!("Publish to unknown topic: {}", publ.topic);
+            log::error!("Unkown action published: {}", publ.topic);
+            self.publish_result("unknown", ERROR, format!("unknown action: {}", publ.topic))
+                .await;
         }
     }
 
-    async fn subscribe(&mut self, topic: &'static str) {
-        log::debug!("Subscribing to {topic}");
-        match self.client.subscribe(topic, QoS::AtLeastOnce).await {
-            Ok(_) => {
-                log::debug!("Subscribed to {topic}");
-            }
+    async fn publish_result(&mut self, action: &str, status: &str, msg: String) {
+        publish_guaranteed_wait(&mut self.client, TOPIC_RESULT_ACTION, false, action).await;
+        publish_guaranteed_wait(&mut self.client, TOPIC_RESULT_STATUS, false, status).await;
+        publish_guaranteed_wait(&mut self.client, TOPIC_RESULT_MSG, false, msg).await;
+    }
+
+    async fn handle_set_action(&mut self, publ: Publish) {
+        let action = publ.topic.strip_prefix("opensleep/actions/").unwrap();
+        let topic = publ.topic.clone();
+        let payload = String::from_utf8_lossy(&publ.payload);
+
+        let (status, msg) = match config::mqtt::handle_action(
+            &mut self.client,
+            &topic,
+            payload.clone(),
+            &mut self.config_tx,
+            &mut self.config_rx,
+        )
+        .await
+        {
+            Ok(_) => (SUCCESS, "successfully edited configuration".to_string()),
+
             Err(e) => {
-                log::error!("Failed to subscribe to {topic}: {e}");
+                log::error!("Error handling set action: {e}");
+                (ERROR, e.to_string())
             }
+        };
+
+        self.publish_result(action, status, msg).await;
+    }
+}
+
+async fn subscribe(client: &mut AsyncClient, topic: &'static str) {
+    log::debug!("Subscribing to {topic}");
+    match client.subscribe(topic, QoS::AtLeastOnce).await {
+        Ok(_) => {
+            log::debug!("Subscribed to {topic}");
+        }
+        Err(e) => {
+            log::error!("Failed to subscribe to {topic}: {e}");
         }
     }
 }
 
-pub fn publish<S, V>(client: &mut AsyncClient, topic: S, qos: QoS, retain: bool, payload: V)
-where
+pub async fn publish_guaranteed_wait<S, V>(
+    client: &mut AsyncClient,
+    topic: S,
+    retain: bool,
+    payload: V,
+) where
     S: Into<String> + Display + Clone,
     V: Into<Vec<u8>>,
 {
-    if let Err(e) = client.try_publish(topic.clone(), qos, retain, payload) {
-        log::error!("Error publishing to {topic}: {e}",);
-    }
-}
+    let fut = client.publish(topic.clone(), QoS::ExactlyOnce, retain, payload);
 
-pub fn publish_guaranteed<S, V>(client: &mut AsyncClient, topic: S, retain: bool, payload: V)
-where
-    S: Into<String> + Display + Clone,
-    V: Into<Vec<u8>>,
-{
-    publish(client, topic, QoS::ExactlyOnce, retain, payload);
+    match timeout(Duration::from_millis(100), fut).await {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => {
+            log::error!("Error publishing {topic}: {e}");
+        }
+        Err(_) => {
+            log::error!("Timed out publishing {topic}");
+        }
+    }
 }
 
 pub fn publish_high_freq<S, V>(client: &mut AsyncClient, topic: S, payload: V)
@@ -141,5 +224,7 @@ where
     S: Into<String> + Display + Clone,
     V: Into<Vec<u8>>,
 {
-    publish(client, topic, QoS::AtMostOnce, false, payload);
+    if let Err(e) = client.try_publish(topic.clone(), QoS::AtMostOnce, false, payload) {
+        log::error!("Error publishing to {topic}: {e}",);
+    }
 }
