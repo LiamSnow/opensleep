@@ -2,25 +2,24 @@
 
 Open-source firmware for the Eight Sleep Pod 3.
 
-Completely replaces all Eight Sleep services (Frank, DAC/PizzaRat, Capybara).
+Completely replaces all Eight Sleep programs running on the SOM (Frank, DAC/PizzaRat, Capybara).
 
-WARNING: The use of opensleep will prevent the mobile app from working.
+## Notices
 
-## TODO
- - [ ] Fix Alarm
- - [ ] Sleep Tracking: Heartrate, HRV, Breathing Rate
- - [ ] Use Sensor's bed temperature readings to improve Frozen
- - [ ] More advanced LED patterns using direct current level control
+This project is purely intended educational and research purposes. It is for personal, non-commercial use only. It is not affiliated with, endorsed by, or sponsored by Eight Sleep. The Eight Sleep name and Pod are trademarks of Eight Sleep, Inc.
+
+The use of opensleep will prevent the mobile app from working and _may_, but most likely will not, permanently alter or damage your device. Use at your own risk.
 
 ## Features
 
-1.  Custom temperature profile
-2.  Vibration alarms
+1.  **MQTT** interface for remotely updating config and monitoring state
+2.  Confugration via **Ron** file
 3.  Presence detection
-4.  Control config and monitor remotely via MQTT
-5.  `Solo` or `Couples` modes
-6.  LED control & effects
-7.  Daily priming
+4.  Custom temperature profile with as many points as you want. It will spready out this profile between `sleep` and `wake` time.
+5.  Vibration alarms relative to `wake` time (offsets and vibration settings can be configured)
+6.  `Solo` or `Couples` modes
+7.  LED control & cool effects
+8.  Daily priming
 
 ## Setup
 
@@ -156,18 +155,14 @@ Download the `opensleep` binary from release page.
 
 `HardwareInfo`: ex. `SN 000157e2 PN 20500 SKU 2 HWREV 0502 FACTORYFLAG 1 DATECODE 16070c`
 
+## Roadmap
+ - [ ] Use Sensor's bed temperature readings to improve Frozen
+ - [ ] Sleep Tracking: Heartrate, HRV, Breathing Rate
+ - [ ] More advanced LED patterns using direct current level control
 
-
-## Credits
-
-This project was inspired by [ninesleep](https://github.com/bobobo1618/ninesleep).
 
 ## Footnotes
 
-This project is not affiliated with or endorsed by Eight Sleep.
-
-If you encounter issues with this project please make an issue on this repository.
-
-For anything else please contact me at [mail@liamsnow.com](mailto:mail@liamsnow.com).
+If you encounter issues with this project please make an issue on this repository. For anything else please contact me at [mail@liamsnow.com](mailto:mail@liamsnow.com).
 
 See more at [liamsnow.com](https://liamsnow.com/projects/opensleep)
