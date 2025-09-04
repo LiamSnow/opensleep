@@ -46,6 +46,7 @@ C++ with simple UNIX socket commands. Controls:
  - "Frozen" over UART (`/dev/ttymxc2`), flashes `firmware-frozen.bbin`
     - Takes l/r temperatures and durations
  - Uploading Raw sensor data + logs to `raw-api-upload.8slp.net:1337`
+   - Ex. `https://update-api.8slp.net/v1/updates/p1/1\?deviceId\=1\&currentRev\=1` points to a bucket
  - What the RAT thermosistor? "ERR:00114015 Thermostat.cpp:220 checkHeatingPowerLevel|RAT bad thermistor, CompTrig set to min 60.00"
 
 ### Device-API-Client (DAC)/PizzaRat (`/home/dac/app`)

@@ -4,20 +4,38 @@ Open-source firmware for the Eight Sleep Pod 3.
 
 Completely replaces all Eight Sleep programs running on the SOM (Frank/frakenfirmware, DAC/PizzaRat, Capybara).
 
+With opensleep you can use your Pod 3 with complete privacy and make cool Home Assistant automations for when you get in and out of bed. Personally I have it set up to read my daily calendar when I get out of bed in the morning and remind to go to bed when its late. 
+
 ## Background
-For some quick background, projects like [ninesleep](https://github.com/bobobo1618/ninesleep),
-[freesleep](https://github.com/throwaway31265/free-sleep), and my original version of opensleep
-all work by pretending to be the DAC (the interface to the Eight Sleep servers) by communicating
-with Frank over a Unix socket.
+### What is the Pod 3
+The Eight Sleep Pod 3 is temperature controlled mattress cover with sleep tracking.
+Normally all raw sensor data is send to the cloud to be processed and converted into
+ sleep tracking data. You view this data and control the mattress via the mobile app.
 
-Frank then manages communication to two "subsystems" called "Sensor" (the STM32 on the sensor unit communicated by over USART via the USB cable) and "Frozen" (an onboard STM32 for managing water pumps, TECs, solenoids, etc.). Capybara's purpose isn't entirely clear to me but its seems to handle initial Bluetooth setup along with I2C control of the LED controller and an IO expander for resetting and enabling Frozen.
+### How Other Projects Work
+Projects like [ninesleep](https://github.com/bobobo1618/ninesleep),
+[freesleep](https://github.com/throwaway31265/free-sleep), and this one all run programs
+on the Varisite SOM running a minimal Yocto Musl Linux build. Having your own firmware
+gives you some nice benefits like privacy (by not sending data to the cloud), more
+control over temp alarms etc, and allow you to add more features. 
 
-While communicating with Frank works totally fine, it limits your ability to get real-time sensor data. I really really wanted to create Home Assistant automations for when I get in and out of bed so I decided to go down this really annoying but also interesting journey.
+Frank then manages communication to two "subsystems" called "Sensor" (the STM32 on the
+sensor unit communicated by over USART via the USB cable) and "Frozen" (an onboard STM32
+for managing water pumps, TECs, solenoids, etc.). Capybara's purpose isn't entirely clear
+to me but its seems to handle initial Bluetooth setup along with I2C control of the LED
+controller and an IO expander for resetting and enabling Frozen.
 
-I will expand it more eventually, but I have some more information at [BACKGROUND.md](BACKGROUND.md).
+Communicating directly with Frank lets you control all functionality of the Pod 3 BUT
+you are not able to get real-time sleep tracking data from it. Furthermore, Frank
+does not work without Capybara.
+
+### How this Project Works
+This project completely replaces Frank, DAC, and Capybara - communicating directly
+with Sensor and Frozen. 
+
+See more about the Pod 3's technical details in [BACKGROUND.md](BACKGROUND.md).
 
 ## Disclaimer
-
 This project is purely intended educational and research purposes. It is for personal, non-commercial use only. It is not affiliated with, endorsed by, or sponsored by Eight Sleep. The Eight Sleep name and Pod are trademarks of Eight Sleep, Inc.
 
 The use of opensleep will prevent the mobile app from working and _may_, but most likely will not, permanently alter or damage your device. Use at your own risk.
@@ -173,9 +191,12 @@ Download the `opensleep` binary from release page.
  - [ ] Sleep Tracking: Heartrate, HRV, Breathing Rate
  - [ ] More advanced LED patterns using direct current level control
 
-
 ## Footnotes
-
 If you encounter issues with this project please make an issue on this repository. For anything else please contact me at [mail@liamsnow.com](mailto:mail@liamsnow.com).
+
+Normally opensleep should run around 0.3-0.6% CPU usage and 0.1% RAM usage.
+If you see numbers above this range, please reach out to me! 
+
+If you have a Pod other than Pod 3 and would be interesting in getting opensleep working on it, please reach out to me!!
 
 See more at [liamsnow.com](https://liamsnow.com/projects/opensleep)
