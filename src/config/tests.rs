@@ -2,9 +2,9 @@ use super::*;
 
 // TODO more testing (esp for MQTT)
 
-#[test]
-fn test_load_solo_config() {
-    let config = Config::load("example_solo.ron").unwrap();
+#[tokio::test]
+async fn test_load_solo_config() {
+    let config = Config::load("example_solo.ron").await.unwrap();
     assert_eq!(config.timezone.iana_name().unwrap(), "America/New_York");
     assert!(!config.away_mode);
     match &config.profile {
@@ -15,9 +15,9 @@ fn test_load_solo_config() {
     }
 }
 
-#[test]
-fn test_load_couples_config() {
-    let config = Config::load("example_couples.ron").unwrap();
+#[tokio::test]
+async fn test_load_couples_config() {
+    let config = Config::load("example_couples.ron").await.unwrap();
     assert_eq!(config.timezone.iana_name().unwrap(), "America/New_York");
     assert!(!config.away_mode);
     match &config.profile {
