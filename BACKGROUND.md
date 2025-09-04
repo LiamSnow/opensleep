@@ -1,4 +1,4 @@
-# Eight Sleep Background
+# Eight Sleep Pod 3 Background
 
 ## Hardware
 Linux SOM (`VAR-SOM-MX8M-MINI_V1.3`) running pretty minimal Yocto build.
