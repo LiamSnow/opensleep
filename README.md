@@ -1,8 +1,7 @@
 # opensleep
 
-Open-source firmware for the Eight Sleep Pod 3.
-
-Completely replaces all Eight Sleep programs running on the SOM (Frank/frakenfirmware, DAC/PizzaRat, Capybara).
+Open-source Rust firmware for the Eight Sleep Pod 3 that completely replaces all of Eight Sleep's
+programs running on the SOM.
 
 With opensleep you can use your Pod 3 with complete privacy and make cool Home Assistant automations for when you get in and out of bed. Personally I have it set up to read my daily calendar when I get out of bed in the morning and remind to go to bed when its late. 
 
@@ -30,8 +29,8 @@ you are not able to get real-time sleep tracking data from it. Furthermore, Fran
 does not work without Capybara.
 
 ### How this Project Works
-This project completely replaces Frank, DAC, and Capybara - communicating directly
-with Sensor and Frozen. 
+This project completely replaces Frank/frankenfirmware, DAC/PizzaRat, and Capybara - communicating
+directly with Sensor and Frozen. 
 
 See more about the Pod 3's technical details in [BACKGROUND.md](BACKGROUND.md).
 
