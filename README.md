@@ -2,17 +2,26 @@
 
 Open-source Rust firmware for the Eight Sleep Pod 3 that completely replaces all of Eight Sleep's programs.
 
-With opensleep you can use your Pod 3 with complete privacy and make cool Home Assistant automations for when you get in and out of bed. Personally I have it set up to read my daily calendar when I get out of bed in the morning and remind to go to bed when its late. 
+With opensleep you can use your Pod 3 with complete privacy and make cool Home Assistant automations for
+when you get in and out of bed. Personally I have it set up to read my daily calendar when I get out of
+bed in the morning and remind to go to bed when its late. 
+
+**TL;DR** Other projects like [ninesleep](https://github.com/bobobo1618/ninesleep) and
+[freesleep](https://github.com/throwaway31265/free-sleep) replace 1/3 of Eight Sleep's
+programs, opensleep replaces them all.
 
 ## Disclaimer
-This project is purely intended educational and research purposes. It is for personal, non-commercial use only. It is not affiliated with, endorsed by, or sponsored by Eight Sleep. The Eight Sleep name and Pod are trademarks of Eight Sleep, Inc.
+This project is purely intended educational and research purposes. It is for personal, non-commercial use only.
+It is not affiliated with, endorsed by, or sponsored by Eight Sleep.
+The Eight Sleep name and Pod are trademarks of Eight Sleep, Inc.
 
-The use of opensleep will prevent the mobile app from working and _may_, but most likely will not, permanently alter or damage your device. Use at your own risk.
+The use of opensleep will prevent the mobile app from working and _may_, but most likely will not,
+permanently alter or damage your device. Use at your own risk.
 
 ## Features
 
 1.  **MQTT** interface for remotely updating config and monitoring state
-2.  Confugration via **Ron** file
+2.  Confugration via **[Ron](https://github.com/ron-rs/ron)** file
 3.  Presence detection
 4.  Custom temperature profile with as many points as you want. It will spready out this profile between `sleep` and `wake` time.
 5.  Vibration alarms relative to `wake` time (offsets and vibration settings can be configured)
@@ -29,14 +38,15 @@ The Eight Sleep Pod 3 is temperature controlled mattress cover with sleep tracki
 Normally all raw sensor data is send to the cloud to be processed and converted into
  sleep tracking data. You view this data and control the mattress via the mobile app.
 
-The Pod 3 has a Varisite System-On-Module (SOM) running a minimal Yocto Musl Linux build.
+The Pod 3 has a [Varisite System-On-Module](https://www.variscite.com/system-on-module-som/i-mx-8/i-mx-8m-mini/var-som-mx8m-mini/)
+ (SOM) running a minimal [Yocto Linux](https://www.yoctoproject.org/) build.
 This is the master controller of the whole system.
 
 ### Definitions
- - **Sensor Subsystem**: an STM32 on the sensor unit (control box inside the matress cover)
+ - **Sensor Subsystem**: an [STM32 microcontroller](https://en.wikipedia.org/wiki/STM32) on the sensor unit (control box inside the matress cover)
    - collects data from all sensors (8 temperature, 6 capacitance, 2 piezoelectric)
    - controls vibration motors for alarm
- - **Frozen Subsystem**: an STM32 on the main control board (where the SOM is located)
+ - **Frozen Subsystem**: an [STM32 microcontroller](https://en.wikipedia.org/wiki/STM32) on the main control board (where the SOM is located)
    - manages 2x thermoelectric coolers for heating and cooling water
    - manages 2x pumps to move water through the system
    - manages priming components (solenoid attached to water tank, water level sensor, reed switch)

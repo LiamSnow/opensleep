@@ -1,7 +1,7 @@
 # Eight Sleep Pod 3 Background
 
 ## Hardware
-Linux SOM (`VAR-SOM-MX8M-MINI_V1.3`) running pretty minimal Yocto build.
+Linux SOM ([VAR-SOM-MX8M-MINI_V1.3](https://www.variscite.com/system-on-module-som/i-mx-8/i-mx-8m-mini/var-som-mx8m-mini/)) running pretty minimal Yocto build.
  - Systems runs off 8GB eMMC normally
  - Micro SD card (16GB industrial SanDisk) contains 3 partitions (p1 to boot from, p3 for persistent storage)
     - If the small button is held in during boot, the SOM will boot from the SD card p1
