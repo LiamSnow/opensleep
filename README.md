@@ -33,19 +33,16 @@ permanently alter or damage your device. Use at your own risk.
 Explaining this projects requires quite a bit of background, so I would highly recommend
 reading this section.
 
-### What is the Pod 3
-The Eight Sleep Pod 3 is temperature controlled mattress cover with sleep tracking.
-Normally all raw sensor data is send to the cloud to be processed and converted into
- sleep tracking data. You view this data and control the mattress via the mobile app.
-
-The Pod 3 has a [Varisite System-On-Module](https://www.variscite.com/system-on-module-som/i-mx-8/i-mx-8m-mini/var-som-mx8m-mini/)
- (SOM) running a minimal [Yocto Linux](https://www.yoctoproject.org/) build.
-This is the master controller of the whole system.
-
-### Definitions
+### Nomenclature
+ - **Eight Sleep**: a temperature controlled mattress cover system with sleep tracking
+   - "system" refers to the fact that its both the matress cover (+ sensors in it) and a physical unit which controls temperature and has a computer onboard
+   - you can control settings of the bed and view sleep tracking data in the mobile app
+   - all sleep tracking is streamed to the cloud (Eight Sleep knows when your in bed and a lot about your sleep.. eek)
+ - **SOM**: refers to the small computer inside the Eight Sleep ([Varisite System-On-Module](https://www.variscite.com/system-on-module-som/i-mx-8/i-mx-8m-mini/var-som-mx8m-mini/))
+   - this is the master controller of the whole system
  - **Sensor Subsystem**: an [STM32 microcontroller](https://en.wikipedia.org/wiki/STM32) on the sensor unit (control box inside the matress cover)
-   - collects data from all sensors (8 temperature, 6 capacitance, 2 piezoelectric)
-   - controls vibration motors for alarm
+   - collects data from all sensors (8 temperature, 6 capacitance, 2 piezoelectric - all lying around check height)
+   - controls vibration motors/alarm
  - **Frozen Subsystem**: an [STM32 microcontroller](https://en.wikipedia.org/wiki/STM32) on the main control board (where the SOM is located)
    - manages 2x thermoelectric coolers for heating and cooling water
    - manages 2x pumps to move water through the system
