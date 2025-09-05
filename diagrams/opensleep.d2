@@ -1,0 +1,86 @@
+direction: down
+
+broker: MQTT Broker {
+  shape: rectangle
+  style.fill: "#e3f2fd"
+  style.font-size: 20
+}
+
+main_unit: Pod {
+  style.fill: "#f5f5f5"
+  style.stroke-width: 3
+  style.font-size: 22
+  
+  som: "Main Computer (SOM)" {
+    style.fill: "#e8eaf6"
+    style.font-size: 18
+    
+    opensleep: "opensleep" {
+      style.fill: "#bbdefb"
+    }
+  }
+  
+  frozen: "Frozen Subsystem" {
+    style.fill: "#e0f7fa"
+    style.font-size: 16
+    
+    water: "Water Control" {
+      shape: text
+      style.font-size: 14
+      label: |md
+      - Heating/cooling (TECs)
+      - 2x Water pumps
+      - Tank management
+      |
+    }
+  }
+}
+
+mattress: "Mattress Cover" {
+  style.fill: "#fce4ec"
+  style.stroke-width: 3
+  style.font-size: 22
+  
+  sensor: "Sensor Unit/Subsystem" {
+    style.fill: "#f8bbd0"
+    style.font-size: 16
+    
+    sensors: "Sensors" {
+      shape: text
+      style.font-size: 14
+      label: |md
+      - 8 temperature
+      - 6 capacitance
+      - 2 piezoelectric
+      - Vibration motors
+      |
+    }
+  }
+}
+
+broker -> main_unit.som.opensleep: "Config" {
+  style.stroke: "#4caf50"
+  style.stroke-width: 2
+}
+
+main_unit.som.opensleep -> broker: "Status" {
+  style.stroke: "#2196f3"
+  style.stroke-width: 2
+}
+
+main_unit.som.opensleep <-> main_unit.frozen: "Temperature\ncontrol" {
+  style.stroke: "#00bcd4"
+  style.stroke-width: 2
+}
+
+main_unit.som.opensleep <-> mattress.sensor: "Sensor data &\nalarm control" {
+  style.stroke: "#00bcd4"
+  style.stroke-width: 2
+}
+
+main_unit -- mattress: "USB Cable" {
+  style.stroke: "#795548"
+  style.stroke-width: 3
+  style.stroke-dash: 5
+}
+

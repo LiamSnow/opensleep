@@ -68,6 +68,13 @@ you cannot get real-time sensor data (you can only see the batch files).
 ### This Project
 Completely replaces Frank, DAC, and Capybara - communicating directly with Sensor and Frozen. 
 
+### Diagrams
+
+![Eight Sleep](diagrams/8.svg)
+![ninesleep](diagrams/ninesleep.svg)
+![opensleep](diagrams/opensleep.svg)
+
+
 ## Setup
 ### SSH
 Before being able to setup and programs to run on Pod's SOM, you are going to need SSH access.
