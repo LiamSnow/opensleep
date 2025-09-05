@@ -70,13 +70,7 @@ Completely replaces Frank, DAC, and Capybara - communicating directly with Senso
 
 ### Diagrams
 
-<table>
-  <tr>
-    <td><img src="diagrams/8.svg" alt="Eight Sleep" width="300"></td>
-    <td><img src="diagrams/ninesleep.svg" alt="Nine Sleep" width="300"></td>
-    <td><img src="diagrams/opensleep.svg" alt="Open Sleep" width="300"></td>
-  </tr>
-</table>
+![Diagram](diagrams/main.svg)
 
 ## Setup
 ### SSH
