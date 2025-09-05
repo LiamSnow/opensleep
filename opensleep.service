@@ -1,5 +1,6 @@
 [Unit]
 Description=opensleep
+After=NetworkManager.service
 
 [Install]
 WantedBy=multi-user.target
