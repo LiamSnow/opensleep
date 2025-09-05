@@ -1,38 +1,8 @@
 # opensleep
 
-Open-source Rust firmware for the Eight Sleep Pod 3 that completely replaces all of Eight Sleep's
-programs running on the SOM.
+Open-source Rust firmware for the Eight Sleep Pod 3 that completely replaces all of Eight Sleep's programs.
 
 With opensleep you can use your Pod 3 with complete privacy and make cool Home Assistant automations for when you get in and out of bed. Personally I have it set up to read my daily calendar when I get out of bed in the morning and remind to go to bed when its late. 
-
-## Background
-### What is the Pod 3
-The Eight Sleep Pod 3 is temperature controlled mattress cover with sleep tracking.
-Normally all raw sensor data is send to the cloud to be processed and converted into
- sleep tracking data. You view this data and control the mattress via the mobile app.
-
-The Pod 3 has a Varisite SOM running a minimal Yocto Musl Linux build. By adding other
-programs into this, you can control the bed with your own code. 
-
-### How Other Projects Work
-Projects like [ninesleep](https://github.com/bobobo1618/ninesleep),
-[freesleep](https://github.com/throwaway31265/free-sleep), and opensleep v1 all interact
-with Frank over a unix socket by pretending to be the DAC. Frank then manages
-communication to two "subsystems" called "Sensor" (the STM32 on the sensor unit communicated
-by over USART via the USB cable) and "Frozen" (an onboard STM32 for managing water pumps,
-TECs, solenoids, etc.). Capybara's purpose isn't entirely clear to me but its seems to
-handle initial Bluetooth setup along with I2C control of the LED controller and an IO
-expander for resetting and enabling Frozen. 
-
-Communicating directly with Frank lets you control all functionality of the Pod 3 BUT
-you are not able to get real-time sleep tracking data from it. Furthermore, Frank
-does not work without Capybara.
-
-### How this Project Works
-This project completely replaces Frank/frankenfirmware, DAC/PizzaRat, and Capybara - communicating
-directly with Sensor and Frozen. 
-
-See more about the Pod 3's technical details in [BACKGROUND.md](BACKGROUND.md).
 
 ## Disclaimer
 This project is purely intended educational and research purposes. It is for personal, non-commercial use only. It is not affiliated with, endorsed by, or sponsored by Eight Sleep. The Eight Sleep name and Pod are trademarks of Eight Sleep, Inc.
@@ -50,19 +20,66 @@ The use of opensleep will prevent the mobile app from working and _may_, but mos
 7.  LED control & cool effects
 8.  Daily priming
 
+## Background
+Explaining this projects requires quite a bit of background, so I would highly recommend
+reading this section.
+
+### What is the Pod 3
+The Eight Sleep Pod 3 is temperature controlled mattress cover with sleep tracking.
+Normally all raw sensor data is send to the cloud to be processed and converted into
+ sleep tracking data. You view this data and control the mattress via the mobile app.
+
+The Pod 3 has a Varisite System-On-Module (SOM) running a minimal Yocto Musl Linux build.
+This is the master controller of the whole system.
+
+### Definitions
+ - **Sensor Subsystem**: an STM32 on the sensor unit (control box inside the matress cover)
+   - collects data from all sensors (8 temperature, 6 capacitance, 2 piezoelectric)
+   - controls vibration motors for alarm
+ - **Frozen Subsystem**: an STM32 on the main control board (where the SOM is located)
+   - manages 2x thermoelectric coolers for heating and cooling water
+   - manages 2x pumps to move water through the system
+   - manages priming components (solenoid attached to water tank, water level sensor, reed switch)
+ - **DAC** (Device API Client/PizzaRat): takes input from Eight Sleep servers to control the bed, sends commands to Frank
+ - **Frank** (frankenfirmware):
+   - controls Sensor and Frozen subsystems
+   - takes commands from DAC to control the bed (IE DAC says set an alarm for tomorrow morning, it schedule a command to be send to Sensor at that time)
+   - collects raw sensor data from the Sensor subsystem, batches it into a file, and uploads it to the Eight Sleep servers
+ - **Capybara**: manages LEDs, initial Bluetooth setup..
+
+See more about the Pod 3's technical details in [BACKGROUND.md](BACKGROUND.md).
+
+### Existing Work
+ - [ninesleep](https://github.com/bobobo1618/ninesleep),
+ - [freesleep](https://github.com/throwaway31265/free-sleep)
+ - opensleep v1 
+
+All work by pretending to be the DAC and sending commands to Frank.
+This achieves full functionality of the bed BUT by keeping Frank
+you cannot get real-time sensor data (you can only see the batch files).
+
+### This Project
+Completely replaces Frank, DAC, and Capybara - communicating directly with Sensor and Frozen. 
+
 ## Setup
+### SSH
+Before being able to setup and programs to run on Pod's SOM, you are going to need SSH access.
+This is NOT an easy mod to do and requires quite a bit of technical know how.
 
-To use opensleep you must disassemble the Eight Sleep Pod 3, modify the SD card's `rootfs.tar.gz`
-to add your SSH key + root password, and reset the Pod. Then power the Pod while holding the small
-button on the back, which performs a factory reset from `rootfs.tar.gz`. Now you can disable
-Eight Sleep's update service and [Add opensleep](#adding-open-sleep-).
+Eventually I will add thorough tutorial for this, but for now I would recommend cross-referencing:
+ - [Bo Lopker's Tutorial](https://blopker.com/writing/04-zerosleep-1/#disassembly-overview)
+ - [ninesleep instructions](https://github.com/bobobo1618/ninesleep?tab=readme-ov-file#instructions)
 
-- **Note**: the default SSH port for Pod 3 is `8822`.
-- **Disable Updates**: `systemctl disable --now swupdate-progress swupdate defibrillator`
+Basically this involve:
+ 1. Partially disassembling the Pod
+ 2. Removing the SD card
+ 3. Modifying the `rootfs.tar.gz` file on the SD card, adding your SSH keys, WiFi network, and own password
+ 4. Reinserting the SD card
+ 5. Powering the Pod up with the small button pressed in (factory resetting the Pod to your new `rootfs.tar.gz` file)
 
-Eventually I will add thorough tutorial for this, but for now I would recommend split-screening
-[Bo Lopker's Tutorial](https://blopker.com/writing/04-zerosleep-1/#disassembly-overview)
-and the [ninesleep instructions](https://github.com/bobobo1618/ninesleep?tab=readme-ov-file#instructions).
+Notes:
+- Default SSH port is `8822`
+- Updates will reset your system, disable the updater with: `systemctl disable --now swupdate-progress swupdate defibrillator`
 
 ### Making your Config
 
@@ -72,10 +89,13 @@ Make a new `config.ron` file. See the examples `example_couples.ron` and `exampl
 
 Download the `opensleep` binary from release page.
 
-1.  Stop services `systemctl disable --now dac frank capybara swupdate-progress swupdate defibrillator eight-kernel telegraf vector`
-2.  Place the binary `opensleep` and `config.ron` at `/opt/opensleep`
-3.  Place the service `opensleep.service` at `/lib/systemd/system`
-4.  Enable opensleep `systemctl enable --now opensleep`
+1.  Disable Eight Sleep services `systemctl disable --now dac frank capybara`
+2.  SCP over the `opensleep` binary, your `config.ron`, and systemd service `opensleep.service`
+3.  Move the binary and config to `/opt/opensleep`
+4.  Move the service to `opensleep.service` at `/lib/systemd/system`
+5.  Enable opensleep `systemctl enable --now opensleep`
+
+Now you're all setup!! You can check logs to make sure everythings working correctly using `journalctl -u opensleep`.
 
 ## MQTT Interface
 
