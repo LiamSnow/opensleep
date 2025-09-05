@@ -178,10 +178,8 @@ pub async fn handle_action(
     topic: &str,
     payload: Cow<'_, str>,
     config_tx: &mut watch::Sender<Config>,
-    config_rx: &mut watch::Receiver<Config>,
+    mut cfg: Config,
 ) -> Result<(), Box<dyn Error>> {
-    let mut cfg = config_rx.borrow().clone();
-
     // modify config
     match topic {
         TOPIC_SET_AWAY_MODE => {

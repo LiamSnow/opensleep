@@ -78,17 +78,9 @@ impl MqttManager {
         }
     }
 
-    async fn subscribe_actions(&mut self) {
-        subscribe(&mut self.client, TOPIC_CALIBRATE).await;
-        subscribe(&mut self.client, TOPIC_SET_AWAY_MODE).await;
-        subscribe(&mut self.client, TOPIC_SET_PRIME).await;
-        subscribe(&mut self.client, TOPIC_SET_PROFILE).await;
-        subscribe(&mut self.client, TOPIC_SET_PRESENCE).await;
-    }
-
     /// this must be in its own task because publishing
     /// topics requires someone polling the event loop
-    async fn spawn_publish_task(&mut self) {
+    async fn spawn_new_conn_task(&mut self) {
         let config = {
             let c = self.config_rx.borrow();
             c.clone()
@@ -96,7 +88,14 @@ impl MqttManager {
         let mut client = self.client.clone();
         let device_label = self.device_label.clone();
         tokio::spawn(async move {
+            subscribe(&mut client, TOPIC_CALIBRATE).await;
+            subscribe(&mut client, TOPIC_SET_AWAY_MODE).await;
+            subscribe(&mut client, TOPIC_SET_PRIME).await;
+            subscribe(&mut client, TOPIC_SET_PROFILE).await;
+            subscribe(&mut client, TOPIC_SET_PRESENCE).await;
+
             config.publish(&mut client).await;
+
             publish_guaranteed_wait(&mut client, TOPIC_AVAILABILITY, false, "online").await;
             publish_guaranteed_wait(&mut client, TOPIC_DEVICE_NAME, false, NAME).await;
             publish_guaranteed_wait(&mut client, TOPIC_DEVICE_VERSION, false, VERSION).await;
@@ -109,8 +108,7 @@ impl MqttManager {
         match msg {
             Ok(Event::Incoming(Packet::ConnAck(_))) => {
                 log::info!("MQTT broker connected");
-                self.subscribe_actions().await;
-                self.spawn_publish_task().await;
+                self.spawn_new_conn_task().await;
                 return true;
             }
             Ok(Event::Incoming(Packet::Disconnect)) => {
@@ -134,55 +132,76 @@ impl MqttManager {
         }
     }
 
+    /// handles a published action
+    /// MUST exit quickly without calling any MQTT commands (unless in another task)
     async fn handle_action(&mut self, publ: Publish) {
         if publ.topic == TOPIC_CALIBRATE {
-            if let Err(e) = self.calibrate_tx.try_send(()) {
+            let (status, msg) = if let Err(e) = self.calibrate_tx.try_send(()) {
                 let msg = format!("Failed to send to calibrate channel: {e}");
                 log::error!("{msg}");
-                self.publish_result("calibrate", ERROR, msg).await;
+                (ERROR, msg)
             } else {
-                self.publish_result("calibrate", SUCCESS, "started calibration".to_string())
-                    .await;
-            }
+                (SUCCESS, "started calibration".to_string())
+            };
+            let mut client = self.client.clone();
+            tokio::spawn(async move {
+                publish_result(&mut client, "calibrate", status, msg).await;
+            });
         } else if publ.topic.starts_with("opensleep/actions/set_") {
             self.handle_set_action(publ).await;
         } else {
             log::error!("Unkown action published: {}", publ.topic);
-            self.publish_result("unknown", ERROR, format!("unknown action: {}", publ.topic))
+            let mut client = self.client.clone();
+            tokio::spawn(async move {
+                publish_result(
+                    &mut client,
+                    "unknown",
+                    ERROR,
+                    format!("unknown action: {}", publ.topic),
+                )
                 .await;
+            });
         }
     }
 
-    async fn publish_result(&mut self, action: &str, status: &str, msg: String) {
-        publish_guaranteed_wait(&mut self.client, TOPIC_RESULT_ACTION, false, action).await;
-        publish_guaranteed_wait(&mut self.client, TOPIC_RESULT_STATUS, false, status).await;
-        publish_guaranteed_wait(&mut self.client, TOPIC_RESULT_MSG, false, msg).await;
-    }
-
+    /// handles any set_ actions (config changes)
+    /// MUST exit quickly without calling any MQTT commands (unless in another task)
     async fn handle_set_action(&mut self, publ: Publish) {
-        let action = publ.topic.strip_prefix("opensleep/actions/").unwrap();
-        let topic = publ.topic.clone();
-        let payload = String::from_utf8_lossy(&publ.payload);
+        let mut client = self.client.clone();
+        let cfg = self.config_rx.borrow().clone();
+        let mut config_tx = self.config_tx.clone();
 
-        let (status, msg) = match config::mqtt::handle_action(
-            &mut self.client,
-            &topic,
-            payload.clone(),
-            &mut self.config_tx,
-            &mut self.config_rx,
-        )
-        .await
-        {
-            Ok(_) => (SUCCESS, "successfully edited configuration".to_string()),
+        tokio::spawn(async move {
+            let action = publ.topic.strip_prefix("opensleep/actions/").unwrap();
+            let topic = publ.topic.clone();
+            let payload = String::from_utf8_lossy(&publ.payload);
 
-            Err(e) => {
-                log::error!("Error handling set action: {e}");
-                (ERROR, e.to_string())
-            }
-        };
+            let (status, msg) = match config::mqtt::handle_action(
+                &mut client,
+                &topic,
+                payload.clone(),
+                &mut config_tx,
+                cfg,
+            )
+            .await
+            {
+                Ok(_) => (SUCCESS, "successfully edited configuration".to_string()),
 
-        self.publish_result(action, status, msg).await;
+                Err(e) => {
+                    log::error!("Error handling set action: {e}");
+                    (ERROR, e.to_string())
+                }
+            };
+
+            publish_result(&mut client, action, status, msg).await;
+        });
     }
+}
+
+async fn publish_result(client: &mut AsyncClient, action: &str, status: &str, msg: String) {
+    publish_guaranteed_wait(client, TOPIC_RESULT_ACTION, false, action).await;
+    publish_guaranteed_wait(client, TOPIC_RESULT_STATUS, false, status).await;
+    publish_guaranteed_wait(client, TOPIC_RESULT_MSG, false, msg).await;
 }
 
 async fn subscribe(client: &mut AsyncClient, topic: &'static str) {
