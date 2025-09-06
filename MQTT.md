@@ -92,7 +92,7 @@
  - `Three`: 0mA\~30mA, Imax=30mA
  - `Four`: 0mA\~40mA, Imax=40mA
 
-`AlarmConfig` may be `None` or a comma-separated list of config, where `PATTERN,INTENSITY,DURATION,OFFSET`. For example:
+`AlarmConfig` may be "disabled" or a comma-separated list of config, where `PATTERN,INTENSITY,DURATION,OFFSET`. For example:
  - `Double,80,600,0`
  - `Single,20,600,0`
 

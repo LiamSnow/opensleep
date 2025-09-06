@@ -63,6 +63,20 @@ pub async fn run(
 
     let mut interval = interval(Duration::from_millis(50));
 
+    let mut count = 50;
+    let mut payloads = vec![
+        SensorCommand::Random(vec![0x2D, 0b00000000, 50]), // Bit 0
+        SensorCommand::Random(vec![0x2D, 0b00000000, 0]),  // Bit 0
+        SensorCommand::Random(vec![0x2D, 0b00000010, 50]), // Bit 1
+        SensorCommand::Random(vec![0x2D, 0b00000010, 0]),  // Bit 1
+        SensorCommand::Random(vec![0x2D, 0b00000100, 50]), // Bit 2
+        SensorCommand::Random(vec![0x2D, 0b00000100, 0]),  // Bit 2
+        SensorCommand::Random(vec![0x2D, 0b00000101, 50]), // Bit 4
+        SensorCommand::Random(vec![0x2D, 0b00000101, 0]),  // Bit 4
+        SensorCommand::Random(vec![0x2D, 0b00000111, 50]), // Bit 4
+        SensorCommand::Random(vec![0x2D, 0b00000111, 0]),  // Bit 4
+    ];
+
     loop {
         tokio::select! {
             Some(result) = reader.next() => match result {
@@ -81,7 +95,19 @@ pub async fn run(
             _ = interval.tick() => {
                 // this is not expensive so its fine to do at 20hz
                 let now = Timestamp::now().to_zoned(timezone.clone()).time();
-                scheduler.update(&state, &now).await;
+                let sent = scheduler.update(&state, &now).await;
+
+                if !sent && count > 100 {
+                    let cmd = payloads.remove(0);
+                    log::warn!("Sending test alarm {cmd:#?}");
+                    match scheduler.writer.send(cmd).await {
+                        Ok(_) => {},
+                        Err(e) => log::error!("failed to send test alarm: {e}"),
+                    }
+                    count = 0;
+                }
+
+                count += 1;
             }
 
             Some(_) = calibrate_rx.recv() => presense_man.start_calibration(),
@@ -205,7 +231,9 @@ impl CommandScheduler {
         }
     }
 
-    async fn update(&mut self, state: &SensorState, time: &Time) -> Option<SensorCommand> {
+    /// finds the first command to send and sends it
+    /// returns if it send a command
+    async fn update(&mut self, state: &SensorState, time: &Time) -> bool {
         let now = Instant::now();
 
         for reg_cmd in &mut self.cmds {
@@ -218,10 +246,11 @@ impl CommandScheduler {
                 if let Err(e) = self.writer.send(sen_cmd).await {
                     log::error!("Failed to send {}: {e}", reg_cmd.name);
                 }
+                return true;
             }
         }
 
-        None
+        false
     }
 }
 

@@ -124,6 +124,7 @@ impl SensorState {
     pub async fn handle_packet(&mut self, client: &mut AsyncClient, packet: SensorPacket) {
         match packet {
             SensorPacket::Pong(in_firmware) => {
+                log::debug!(" <-- Pong");
                 self.set_device_mode(client, DeviceMode::from_pong(in_firmware))
                     .await;
             }

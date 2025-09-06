@@ -33,7 +33,7 @@ pub enum SensorCommand {
     #[allow(dead_code)]
     GetHeaterOffset,
     #[allow(dead_code)]
-    Random(u8),
+    Random(Vec<u8>),
 }
 
 impl CommandTrait for SensorCommand {
@@ -64,7 +64,7 @@ impl CommandTrait for SensorCommand {
             EnableVibration => command(vec![0x2E]),
             ProbeTemperature => command(vec![0x2F, 0xFF]),
             GetHeaterOffset => command(vec![0x2A]),
-            Random(cmd) => command(vec![*cmd]),
+            Random(cmd) => command(cmd.clone()),
             SetAlarm(cmd) => {
                 let payload = vec![
                     0x2C,
@@ -87,8 +87,12 @@ impl CommandTrait for SensorCommand {
 #[strum(serialize_all = "lowercase")]
 #[repr(u8)]
 pub enum AlarmPattern {
-    Single = 0x00,
-    Double = 0x01,
+    Single = 0b00,
+    Double = 0b01,
+    Unkown1 = 0b10,
+    Unkown2 = 0b11,
+    // 0b100 breaks it
+    // 0b101+ seems to work tho?
 }
 
 #[derive(Debug, Clone)]
