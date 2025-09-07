@@ -70,7 +70,7 @@ Completely replaces Frank, DAC, and Capybara - communicating directly with Senso
 
 ### Diagrams
 
-![Diagram](diagrams/main.svg)
+![Diagram](images/main.svg)
 
 ## Setup
 Before being able to setup and programs to run on Pod's SOM, you are going to need SSH access.
@@ -81,6 +81,12 @@ See [SETUP.md](SETUP.md)
 
 ## MQTT Spec
 Please see [MQTT.md](MQTT.md)
+
+## UI
+opensleep does not currently have a UI, however, you can easily build one in Home Assistant using MQTT. See [HASS.md](HASS.md)
+
+![Home Assistant Dashboard](images/hass.png)
+
 
 ## Roadmap
  - [ ] Use Sensor's bed temperature readings to improve Frozen

@@ -93,8 +93,8 @@
  - `Four`: 0mA\~40mA, Imax=40mA
 
 `AlarmConfig` may be "disabled" or a comma-separated list of config, where `PATTERN,INTENSITY,DURATION,OFFSET`. For example:
- - `Double,80,600,0`
- - `Single,20,600,0`
+ - `double,80,600,0`
+ - `single,20,600,0`
 
 `centidegrees_celcius` a u16 representing a temperature in centidegrees celcius IE `deg C * 100`
 
