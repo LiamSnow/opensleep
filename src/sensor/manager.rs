@@ -53,7 +53,7 @@ pub async fn run(
     let mut state = SensorState::default();
     let mut presense_man = PresenseManager::new(config_tx, config_rx.clone(), client.clone());
 
-    let (writer, mut reader) = run_discovery(port, &mut client, &mut state).await.unwrap();
+    let (writer, mut reader) = run_discovery(port, &mut client, &mut state).await?;
     log::info!("Connected");
 
     let cfg = config_rx.borrow_and_update();

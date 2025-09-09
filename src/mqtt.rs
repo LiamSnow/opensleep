@@ -6,7 +6,9 @@ use crate::{
     },
     sensor::presence::TOPIC_CALIBRATE,
 };
-use rumqttc::{AsyncClient, ConnectionError, Event, EventLoop, MqttOptions, Packet, Publish, QoS};
+use rumqttc::{
+    AsyncClient, ConnectionError, Event, EventLoop, LastWill, MqttOptions, Packet, Publish, QoS,
+};
 use std::{fmt::Display, time::Duration};
 use tokio::{
     sync::{mpsc, watch},
@@ -14,6 +16,8 @@ use tokio::{
 };
 
 const TOPIC_AVAILABILITY: &str = "opensleep/availability";
+const ONLINE: &str = "online";
+const OFFLINE: &str = "offline";
 
 const TOPIC_DEVICE_NAME: &str = "opensleep/device/name";
 const TOPIC_DEVICE_VERSION: &str = "opensleep/device/version";
@@ -57,6 +61,12 @@ impl MqttManager {
         let mut opts = MqttOptions::new("opensleep", &cfg.server, cfg.port);
         opts.set_keep_alive(Duration::from_secs(60));
         opts.set_credentials(&cfg.user, &cfg.password);
+        opts.set_last_will(LastWill {
+            topic: TOPIC_AVAILABILITY.to_string(),
+            message: OFFLINE.into(),
+            qos: QoS::ExactlyOnce,
+            retain: false,
+        });
 
         let (client, eventloop) = AsyncClient::new(opts, 10);
 
@@ -84,7 +94,7 @@ impl MqttManager {
         }
     }
 
-    pub async fn run(mut self) {
+    pub async fn run(&mut self) {
         loop {
             let evt = self.eventloop.poll().await;
             if self.handle_event(evt).await.is_err() {
@@ -100,6 +110,7 @@ impl MqttManager {
         match msg {
             Ok(Event::Incoming(Packet::ConnAck(_))) => {
                 log::info!("MQTT broker connected");
+                self.reconnect_attempts = 0;
                 self.spawn_new_conn_task().await;
                 return Ok(true);
             }
@@ -184,10 +195,10 @@ impl MqttManager {
 
             config.publish(&mut client).await;
 
-            publish_guaranteed_wait(&mut client, TOPIC_AVAILABILITY, false, "online").await;
-            publish_guaranteed_wait(&mut client, TOPIC_DEVICE_NAME, false, NAME).await;
-            publish_guaranteed_wait(&mut client, TOPIC_DEVICE_VERSION, false, VERSION).await;
-            publish_guaranteed_wait(&mut client, TOPIC_DEVICE_LABEL, false, device_label).await;
+            publish_guaranteed_wait(&mut client, TOPIC_AVAILABILITY, true, ONLINE).await;
+            publish_guaranteed_wait(&mut client, TOPIC_DEVICE_NAME, true, NAME).await;
+            publish_guaranteed_wait(&mut client, TOPIC_DEVICE_VERSION, true, VERSION).await;
+            publish_guaranteed_wait(&mut client, TOPIC_DEVICE_LABEL, true, device_label).await;
         });
     }
 

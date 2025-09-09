@@ -139,6 +139,8 @@ impl SensorPacket {
     /// Strict tests are used to enforce behavior.
     /// If you have a better method please reach out to me!!
     fn parse_capacitance(buf: BytesMut) -> Result<Self, PacketError> {
+        // example bad packet: 33 08 46 30 0c 00 00 00 00 00 00 7d 5d 01 00 a3 02 00 fc 03 01 18 04 01 c3 05 01
+
         validate_packet_size("Sensor/Capacitance", &buf, 27)?;
 
         let indices_valid = buf[9] == 0
