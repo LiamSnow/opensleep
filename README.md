@@ -93,6 +93,12 @@ opensleep does not currently have a UI, however, you can easily build one in Hom
  - [ ] Sleep Tracking: Heartrate, HRV, Breathing Rate
  - [ ] More advanced LED patterns using direct current level control
 
+## Development
+Running in debug mode:
+```bash
+RUST_LOG=debug,rumqttc=info ./opensleep
+```
+
 ## Footnotes
 If you encounter issues with this project please make an issue on this repository. For anything else please contact me at [mail@liamsnow.com](mailto:mail@liamsnow.com).
 
