@@ -10,7 +10,7 @@ use rumqttc::{AsyncClient, ConnectionError, Event, EventLoop, MqttOptions, Packe
 use std::{fmt::Display, time::Duration};
 use tokio::{
     sync::{mpsc, watch},
-    time::timeout,
+    time::{sleep, timeout},
 };
 
 const TOPIC_AVAILABILITY: &str = "opensleep/availability";
@@ -33,6 +33,7 @@ pub struct MqttManager {
     pub client: AsyncClient,
     eventloop: EventLoop,
     device_label: String,
+    reconnect_attempts: u32,
 }
 
 impl MqttManager {
@@ -66,16 +67,103 @@ impl MqttManager {
             client,
             eventloop,
             device_label,
+            reconnect_attempts: 0,
         }
     }
 
-    pub async fn wait_for_conn(&mut self) {
+    pub async fn wait_for_conn(&mut self) -> Result<(), ()> {
         loop {
             let evt = self.eventloop.poll().await;
-            if self.handle_event(evt).await {
+            match self.handle_event(evt).await {
+                Ok(true) => return Ok(()),
+                // keep waiting for connection
+                Ok(false) => {}
+                // fatal error
+                Err(_) => return Err(()),
+            }
+        }
+    }
+
+    pub async fn run(mut self) {
+        loop {
+            let evt = self.eventloop.poll().await;
+            if self.handle_event(evt).await.is_err() {
+                // only errors on fatal errors, so `run` should
+                // quit, shutting down all of opensleep
                 return;
             }
         }
+    }
+
+    /// returns Ok(true) on ConnAck, Err(()) for fatal errors
+    async fn handle_event(&mut self, msg: Result<Event, ConnectionError>) -> Result<bool, ()> {
+        match msg {
+            Ok(Event::Incoming(Packet::ConnAck(_))) => {
+                log::info!("MQTT broker connected");
+                self.spawn_new_conn_task().await;
+                return Ok(true);
+            }
+            Ok(Event::Incoming(Packet::Disconnect)) => {
+                log::warn!("MQTT broker disconnected");
+            }
+            Ok(Event::Incoming(Packet::Publish(publ))) => {
+                self.handle_action(publ).await;
+            }
+            Ok(_) => {}
+
+            // connection errors
+            Err(ConnectionError::Io(e)) => {
+                self.reconnect_attempts += 1;
+                let backoff = self.calc_backoff();
+                log::error!("I/O error: {e}. Reconnecting in {backoff:?}...");
+                sleep(backoff).await;
+            }
+            Err(ConnectionError::ConnectionRefused(code)) => {
+                self.reconnect_attempts += 1;
+                let backoff = self.calc_backoff();
+                log::error!("Connection refused ({code:?}). Reconnecting in {backoff:?}...");
+                sleep(backoff).await;
+            }
+            Err(ConnectionError::NetworkTimeout) => {
+                self.reconnect_attempts += 1;
+                let backoff = self.calc_backoff();
+                log::error!("Network timeout. Reconnecting in {backoff:?}...");
+                sleep(backoff).await;
+            }
+            Err(ConnectionError::Tls(e)) => {
+                self.reconnect_attempts += 1;
+                let backoff = self.calc_backoff();
+                log::error!("TLS error: {e}. Reconnecting in {backoff:?}...");
+                sleep(backoff).await;
+            }
+
+            // state errors
+            Err(ConnectionError::MqttState(e)) => {
+                log::error!("State error: {e}");
+                sleep(Duration::from_millis(100)).await;
+            }
+            Err(ConnectionError::FlushTimeout) => {
+                log::error!("Flush timeout");
+                sleep(Duration::from_millis(100)).await;
+            }
+
+            // fatal errors
+            Err(ConnectionError::RequestsDone) => {
+                log::info!("Requests channel closed");
+                return Err(());
+            }
+
+            // other
+            Err(ConnectionError::NotConnAck(packet)) => {
+                log::error!("Expected ConnAck, got: {packet:?}");
+            }
+        }
+        Ok(false)
+    }
+
+    fn calc_backoff(&self) -> Duration {
+        let secs = (2u64.pow(self.reconnect_attempts.saturating_sub(1))).min(60);
+        Duration::from_secs(secs)
     }
 
     /// this must be in its own task because publishing
@@ -101,35 +189,6 @@ impl MqttManager {
             publish_guaranteed_wait(&mut client, TOPIC_DEVICE_VERSION, false, VERSION).await;
             publish_guaranteed_wait(&mut client, TOPIC_DEVICE_LABEL, false, device_label).await;
         });
-    }
-
-    /// returns true if connected
-    async fn handle_event(&mut self, msg: Result<Event, ConnectionError>) -> bool {
-        match msg {
-            Ok(Event::Incoming(Packet::ConnAck(_))) => {
-                log::info!("MQTT broker connected");
-                self.spawn_new_conn_task().await;
-                return true;
-            }
-            Ok(Event::Incoming(Packet::Disconnect)) => {
-                log::warn!("MQTT broker disconnected");
-            }
-            Ok(Event::Incoming(Packet::Publish(publ))) => {
-                self.handle_action(publ).await;
-            }
-            Ok(_) => {}
-            Err(e) => {
-                log::error!("MQTT event loop error: {e}");
-            }
-        }
-        false
-    }
-
-    pub async fn run(mut self) {
-        loop {
-            let evt = self.eventloop.poll().await;
-            self.handle_event(evt).await;
-        }
     }
 
     /// handles a published action

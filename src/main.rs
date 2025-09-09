@@ -19,7 +19,7 @@ pub const NAME: &str = "opensleep";
 #[tokio::main]
 pub async fn main() {
     env_logger::init();
-    log::info!("Starting OpenSleep...");
+    log::info!("Starting opensleep...");
 
     // read device label
     let device_label =
@@ -47,7 +47,11 @@ pub async fn main() {
         calibrate_tx,
         device_label,
     );
-    mqtt_man.wait_for_conn().await;
+
+    if mqtt_man.wait_for_conn().await.is_err() {
+        log::error!("Fatal error starting MQTT. Shutting down...");
+        return;
+    }
 
     tokio::select! {
         res = frozen::run(
@@ -80,5 +84,5 @@ pub async fn main() {
         }
     }
 
-    log::info!("Shutting down OpenSleep...");
+    log::info!("Shutting down opensleep...");
 }
