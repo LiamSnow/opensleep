@@ -45,7 +45,7 @@ pub enum PacketError {
     },
 }
 
-#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize, Display, FromRepr)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Display, FromRepr, PartialEq, Eq)]
 #[repr(u8)]
 pub enum BedSide {
     Left = 0x00,

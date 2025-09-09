@@ -8,9 +8,9 @@ use tokio_util::codec::Framed;
 
 #[derive(Error, Debug)]
 pub enum SerialError {
-    #[error("Serial port error: {0}")]
+    #[error("IO: {0}")]
     Io(#[from] std::io::Error),
-    #[error("Serial port error: {0}")]
+    #[error("Serial: {0}")]
     Serial(#[from] tokio_serial::Error),
 }
 

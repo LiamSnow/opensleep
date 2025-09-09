@@ -14,6 +14,7 @@ use futures_util::{SinkExt, StreamExt};
 use jiff::civil::Time;
 use jiff::{Span, Timestamp};
 use rumqttc::AsyncClient;
+use thiserror::Error;
 use tokio::sync::{mpsc, watch};
 use tokio::time::{Instant, interval, timeout};
 use tokio_serial::SerialStream;
@@ -22,6 +23,7 @@ use tokio_util::codec::Framed;
 pub const PORT: &str = "/dev/ttymxc0";
 const BOOTLOADER_BAUD: u32 = 38400;
 const FIRMWARE_BAUD: u32 = 115200;
+const TIMEOUT: Duration = Duration::from_secs(5);
 
 type Reader = SplitStream<Framed<SerialStream, PacketCodec<SensorPacket>>>;
 type Writer = SplitSink<Framed<SerialStream, PacketCodec<SensorPacket>>, SensorCommand>;
@@ -41,13 +43,21 @@ struct RegisteredCommand {
     can_run: CommandCheck,
 }
 
+#[derive(Error, Debug)]
+pub enum SensorError {
+    #[error("Serial: {0}")]
+    Serial(#[from] SerialError),
+    #[error("Sensor not responding")]
+    Timeout,
+}
+
 pub async fn run(
     port: &'static str,
     config_tx: watch::Sender<Config>,
     mut config_rx: watch::Receiver<Config>,
     mut calibrate_rx: mpsc::Receiver<()>,
     mut client: AsyncClient,
-) -> Result<(), SerialError> {
+) -> Result<(), SensorError> {
     log::info!("Initializing Sensor Subsystem...");
 
     let mut state = SensorState::default();
@@ -62,6 +72,7 @@ pub async fn run(
     drop(cfg);
 
     let mut interval = interval(Duration::from_millis(50));
+    let mut last_recv = Instant::now();
 
     loop {
         tokio::select! {
@@ -72,6 +83,8 @@ pub async fn run(
                     }
 
                     state.handle_packet(&mut client, packet).await;
+
+                    last_recv = Instant::now();
                 }
                 Err(e) => {
                     log::error!("Packet decode error: {e}");
@@ -81,7 +94,11 @@ pub async fn run(
             _ = interval.tick() => {
                 // this is not expensive so its fine to do at 20hz
                 let now = Timestamp::now().to_zoned(timezone.clone()).time();
-                let _ = scheduler.update(&state, &now).await;
+                let _ = scheduler.update(&state, &now).await?;
+
+                if Instant::now().duration_since(last_recv) > TIMEOUT {
+                    break Err(SensorError::Timeout);
+                }
             }
 
             Some(_) = calibrate_rx.recv() => presense_man.start_calibration(),
@@ -207,9 +224,10 @@ impl CommandScheduler {
 
     /// finds the first command to send and sends it
     /// returns if it send a command
-    async fn update(&mut self, state: &SensorState, time: &Time) -> bool {
+    async fn update(&mut self, state: &SensorState, time: &Time) -> Result<bool, SensorError> {
         let now = Instant::now();
 
+        // find command to send
         for reg_cmd in &mut self.cmds {
             if now.duration_since(reg_cmd.last_run) > reg_cmd.interval
                 && let Some(sen_cmd) =
@@ -220,11 +238,11 @@ impl CommandScheduler {
                 if let Err(e) = self.writer.send(sen_cmd).await {
                     log::error!("Failed to send {}: {e}", reg_cmd.name);
                 }
-                return true;
+                return Ok(true);
             }
         }
 
-        false
+        Ok(false)
     }
 }
 
@@ -320,7 +338,7 @@ async fn ping_device(
 
     Err(SerialError::Io(std::io::Error::new(
         ErrorKind::NotFound,
-        "Device not responding",
+        "Sensor not responding",
     )))
 }
 

@@ -6,7 +6,7 @@ use crate::common::{
     packet::BedSide,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SensorCommand {
     Ping,
     GetHardwareInfo,
@@ -83,7 +83,7 @@ impl CommandTrait for SensorCommand {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Display, EnumString, FromRepr)]
+#[derive(Debug, Clone, Serialize, Deserialize, Display, EnumString, FromRepr, PartialEq, Eq)]
 #[strum(serialize_all = "lowercase")]
 #[repr(u8)]
 pub enum AlarmPattern {
@@ -95,7 +95,7 @@ pub enum AlarmPattern {
     // 0b101+ seems to work tho?
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AlarmCommand {
     pub side: BedSide,
     pub intensity: u8, // percentage 0-100
