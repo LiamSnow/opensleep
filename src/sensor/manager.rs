@@ -60,8 +60,10 @@ pub async fn run(
 ) -> Result<(), SensorError> {
     log::info!("Initializing Sensor Subsystem...");
 
-    let mut state = SensorState::default();
     let mut presense_man = PresenseManager::new(config_tx, config_rx.clone(), client.clone());
+
+    let mut state = SensorState::default();
+    state.publish_reset(&mut client).await;
 
     let (writer, mut reader) = run_discovery(port, &mut client, &mut state).await?;
     log::info!("Connected");

@@ -62,6 +62,7 @@ pub async fn run(
     let (mut writer, mut reader) = create_framed_port::<FrozenPacket>(port, BAUD)?.split();
 
     let mut state = FrozenState::default();
+    state.publish_reset(&mut client).await;
 
     // grab hwinfo @ boot
     send_command(&mut writer, FrozenCommand::Ping).await;

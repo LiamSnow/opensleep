@@ -47,6 +47,10 @@ impl FrozenState {
             || self.right_target.as_ref().is_some_and(|t| t.enabled)
     }
 
+    pub async fn publish_reset(&self, client: &mut AsyncClient) {
+        publish_guaranteed_wait(client, TOPIC_MODE, false, DeviceMode::Unknown.to_string()).await;
+    }
+
     pub async fn handle_packet(&mut self, client: &mut AsyncClient, packet: FrozenPacket) {
         match packet {
             FrozenPacket::Pong(in_firmware) => {

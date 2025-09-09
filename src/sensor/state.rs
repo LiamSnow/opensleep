@@ -74,6 +74,10 @@ impl SensorState {
         publish_guaranteed_wait(client, TOPIC_PIEZO_OK, false, self.piezo_ok().to_string()).await;
     }
 
+    pub async fn publish_reset(&self, client: &mut AsyncClient) {
+        publish_guaranteed_wait(client, TOPIC_MODE, false, DeviceMode::Unknown.to_string()).await;
+    }
+
     /// [%s] off
     /// [%s] start: power %u, pattern %u, dur %u ms
     /// [%s] no longer running (max duration)
