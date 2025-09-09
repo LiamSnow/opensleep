@@ -10,6 +10,7 @@ use futures_util::{SinkExt, StreamExt, stream::SplitSink};
 use jiff::{SignedDuration, Timestamp, civil::Time, tz::TimeZone};
 use linux_embedded_hal::I2cdev;
 use rumqttc::AsyncClient;
+use thiserror::Error;
 use tokio::sync::watch;
 use tokio::time::{Duration, Instant, interval, sleep};
 use tokio_serial::SerialStream;
@@ -20,6 +21,7 @@ const BAUD: u32 = 38400;
 
 const HWINFO_INT: Duration = Duration::from_secs(1);
 const TEMP_INT: Duration = Duration::from_secs(10);
+const MAX_WAKE_ATTEMPTS: u32 = 5;
 
 struct CommandTimers {
     last_wake: Instant,
@@ -29,6 +31,14 @@ struct CommandTimers {
     last_prime: Instant,
 }
 
+#[derive(Error, Debug)]
+pub enum FrozenError {
+    #[error("Serial: {0}")]
+    Serial(#[from] SerialError),
+    #[error("Failed to wake up Frozen")]
+    FailedToWake,
+}
+
 type Writer = SplitSink<Framed<SerialStream, PacketCodec<FrozenPacket>>, FrozenCommand>;
 
 pub async fn run(
@@ -36,7 +46,7 @@ pub async fn run(
     mut config_rx: watch::Receiver<Config>,
     mut led: IS31FL3194Controller<I2cdev>,
     mut client: AsyncClient,
-) -> Result<(), SerialError> {
+) -> Result<(), FrozenError> {
     log::info!("Initializing Frozen Subsystem...");
 
     let cfg = config_rx.borrow_and_update();
@@ -61,6 +71,7 @@ pub async fn run(
     let mut interval = interval(Duration::from_millis(20));
     let mut timers = CommandTimers::default();
     let mut was_active = false;
+    let mut wake_attempts = 0;
 
     loop {
         tokio::select! {
@@ -98,12 +109,19 @@ pub async fn run(
 
                 // ready to send command
                 if state.is_awake() {
+                    wake_attempts = 0;
                     send_command(&mut writer, cmd).await;
                 }
 
                 // keep trying to wake it up, give it 2 seconds every attempt
                 else if now.duration_since(timers.last_wake) > Duration::from_secs(2) {
                     timers.last_wake = now;
+                    wake_attempts += 1;
+
+                    if wake_attempts > MAX_WAKE_ATTEMPTS {
+                        break Err(FrozenError::FailedToWake)
+                    }
+
                     if let Err(e) = writer.send(FrozenCommand::Ping).await {
                         log::error!("Failed to ping: {e}");
                     }
