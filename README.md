@@ -21,7 +21,7 @@ permanently alter or damage your device. Use at your own risk.
 ## Features
 
 1.  **MQTT** interface for remotely updating config and monitoring state
-2.  Confugration via **[Ron](https://github.com/ron-rs/ron)** file
+2.  Configuration via **[Ron](https://github.com/ron-rs/ron)** file
 3.  Presence detection
 4.  Custom temperature profile with as many points as you want. It will spready out this profile between `sleep` and `wake` time.
 5.  Vibration alarms relative to `wake` time (offsets and vibration settings can be configured)

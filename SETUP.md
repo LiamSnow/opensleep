@@ -1,5 +1,6 @@
-# SSH Setup
+# opensleep setup
 
+## SSH setup
 | Pod | Setup |
 | --- | ----- |
 | Pod 1 | ❌ not possible |
@@ -12,7 +13,7 @@
 WARNING: opensleep has only been tested with Pod 3. Pod 4 and 5 specific features are NOT implemented.
 If you would like to help add Pod 4 & 5 support please contact me!
 
-## Pod 3 with SD Card
+### Pod 3 with SD Card
 
 Eventually I will add thorough tutorial for this, but for now I would recommend cross-referencing:
  - [Bo Lopker's Tutorial](https://blopker.com/writing/04-zerosleep-1/#disassembly-overview)
@@ -28,3 +29,10 @@ Basically this involve:
 Notes:
 - Default SSH port is `8822`
 - Updates will reset your system, disable the updater with: `systemctl disable --now swupdate-progress swupdate defibrillator`
+
+## adding opensleep
+ 1. Make a new `config.ron` file based of the examples: `example_couples.ron` or `example_solo.ron`.
+ 2. Stop services: `systemctl disable --now dac frank capybara swupdate-progress swupdate defibrillator`
+ 3. Place the binary `opensleep` and `config.ron` at `/opt/opensleep`
+ 4. Place the service `opensleep.service` at `/lib/systemd/system`
+ 5. Enable opensleep `systemctl enable --now opensleep`
