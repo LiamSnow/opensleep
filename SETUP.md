@@ -19,7 +19,7 @@ Eventually I will add thorough tutorial for this, but for now I would recommend 
  - [Bo Lopker's Tutorial](https://blopker.com/writing/04-zerosleep-1/#disassembly-overview)
  - [ninesleep instructions](https://github.com/bobobo1618/ninesleep?tab=readme-ov-file#instructions)
 
-Basically this involve:
+Basically this involves:
  1. Partially disassembling the Pod
  2. Removing the SD card
  3. Modifying the `rootfs.tar.gz` file on the SD card, adding your SSH keys, WiFi network, and own password
@@ -30,7 +30,7 @@ Notes:
 - Default SSH port is `8822`
 - Updates will reset your system, disable the updater with: `systemctl disable --now swupdate-progress swupdate defibrillator`
 
-## adding opensleep
+## Adding opensleep
  1. Make a new `config.ron` file based of the examples: `example_couples.ron` or `example_solo.ron`.
  2. Stop services: `systemctl disable --now dac frank capybara swupdate-progress swupdate defibrillator`
  3. Place the binary `opensleep` and `config.ron` at `/opt/opensleep`

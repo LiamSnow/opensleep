@@ -1,105 +1,105 @@
 # opensleep
 
-Open-source Rust firmware for the Eight Sleep Pod 3 that completely replaces all of Eight Sleep's programs.
-
-With opensleep you can use your Pod 3 with complete privacy and make cool Home Assistant automations for
-when you get in and out of bed. Personally I have it set up to read my daily calendar when I get out of
-bed in the morning and remind me to go to bed when it's late. 
-
-**TL;DR** Other projects like [ninesleep](https://github.com/bobobo1618/ninesleep) and
-[freesleep](https://github.com/throwaway31265/free-sleep) replace 1/3 of Eight Sleep's
-programs, opensleep replaces them all.
+Open-source Rust firmware for the Eight Sleep Pod 3 that completely replaces Eight Sleep's proprietary software stack.
 
 ## Disclaimer
-This project is purely intended for educational and research purposes. It is for personal, non-commercial use only.
-It is not affiliated with, endorsed by, or sponsored by Eight Sleep.
-The Eight Sleep name and Pod are trademarks of Eight Sleep, Inc.
 
-The use of opensleep will prevent the mobile app from working and _may_, but most likely will not,
-permanently alter or damage your device. Use at your own risk.
+This project is for educational and research purposes only. It is for personal, non-commercial use and is not affiliated with, endorsed by, or sponsored by Eight Sleep. The Eight Sleep name and Pod are trademarks of Eight Sleep, Inc.
+
+Using opensleep will prevent the Eight Sleep mobile app from working and may (though unlikely) permanently alter or damage your device. **Use at your own risk.**
+
+## What is Eight Sleep?
+
+The Eight Sleep Pod 3 is a smart mattress cover that uses water circulation to control temperature (55°F to 110°F) and tracks sleep metrics. While powerful, Eight Sleep's default firmware streams all sleep data to their servers, including when you're in bed, how many people are in bed, and your sleep patterns.
+
+## Why Replace the Firmware?
+
+1. **Complete Privacy**: All data stays local.
+2. **Smart Home Integration**: Direct control through Home Assistant, MQTT, or custom automations instead of being locked to Eight Sleep's app.
+3. **Enhanced Features**: Custom temperature profiles, alarms, etc.
 
 ## Features
 
-1.  **MQTT** interface for remotely updating config and monitoring state
-2.  Configuration via **[Ron](https://github.com/ron-rs/ron)** file
-3.  Presence detection
-4.  Custom temperature profile with as many points as you want. It will spread out this profile between `sleep` and `wake` time.
-5.  Vibration alarms relative to `wake` time (offsets and vibration settings can be configured)
-6.  `Solo` or `Couples` modes
-7.  LED control & cool effects
-8.  Daily priming
+1. **MQTT** interface for remote configuration and state monitoring
+2. Configuration via **[Ron](https://github.com/ron-rs/ron)** file
+3. Presence detection
+4. Custom temperature profiles with unlimited points, automatically distributed between `sleep` and `wake` times
+5. Vibration alarms relative to `wake` time (offsets and vibration settings are configurable)
+6. `Solo` or `Couples` modes
+7. LED control with custom effects
+8. Daily priming
 
-## Background
-Explaining this project requires quite a bit of background, so I would highly recommend
-reading this section.
+## How This Differs from Other Projects
 
-### Nomenclature
- - **Eight Sleep**: a temperature controlled mattress cover system with sleep tracking
-   - "system" refers to the fact that its both the mattress cover (+ sensors in it) and a physical unit which controls temperature and has a computer onboard
-   - you can control settings of the bed and view sleep tracking data in the mobile app
-   - all sleep tracking is streamed to the cloud (Eight Sleep knows when you're in bed and a lot about your sleep.. eek)
- - **SOM**: refers to the small computer inside the Eight Sleep ([Varisite System-On-Module](https://www.variscite.com/system-on-module-som/i-mx-8/i-mx-8m-mini/var-som-mx8m-mini/))
-   - this is the master controller of the whole system
- - **Sensor Subsystem**: an [STM32 microcontroller](https://en.wikipedia.org/wiki/STM32) on the sensor unit (control box inside the mattress cover)
-   - collects data from all sensors (8 temperature, 6 capacitance, 2 piezoelectric - all lying around chest height)
-   - controls vibration motors/alarm
- - **Frozen Subsystem**: an [STM32 microcontroller](https://en.wikipedia.org/wiki/STM32) on the main control board (where the SOM is located)
-   - manages 2x thermoelectric coolers for heating and cooling water
-   - manages 2x pumps to move water through the system
-   - manages priming components (solenoid attached to water tank, water level sensor, reed switch)
- - **DAC** (Device API Client/PizzaRat): takes input from Eight Sleep servers to control the bed, sends commands to Frank
- - **Frank** (frankenfirmware):
-   - controls Sensor and Frozen subsystems
-   - takes commands from DAC to control the bed (IE DAC says set an alarm for tomorrow morning, it schedule a command to be send to Sensor at that time)
-   - collects raw sensor data from the Sensor subsystem, batches it into a file, and uploads it to the Eight Sleep servers
- - **Capybara**: manages LEDs, initial Bluetooth setup..
+Other projects like [ninesleep](https://github.com/bobobo1618/ninesleep) and [freesleep](https://github.com/throwaway31265/free-sleep) work by replacing the Device-API-Client (DAC).
+By replacing the DAC, they can communicate directly with frankenfirmware and send temperature commands,
+receive sleep tracking data, set alarms, etc.
 
-See more about the Pod 3's technical details in [BACKGROUND.md](BACKGROUND.md).
+**opensleep replaces all Eight Sleep programs**, communicating directly with the microcontrollers that manage sensors and temperature control. This enables real-time sensor data access and complete control over the Pod's behavior.
 
-### Existing Work
- - [ninesleep](https://github.com/bobobo1618/ninesleep),
- - [freesleep](https://github.com/throwaway31265/free-sleep)
- - opensleep v1 
+![Diagram showing opensleep architecture](images/main.svg)
 
-These all work by pretending to be the DAC and sending commands to Frank.
-This achieves full functionality of the bed BUT by keeping Frank
-you cannot get real-time sensor data (you can only see the batch files).
+## Technical Overview
 
-### This Project
-Completely replaces Frank, DAC, and Capybara - communicating directly with Sensor and Frozen. 
+The Eight Sleep Pod 3 consists of:
 
-### Diagrams
+- **SOM** (System-On-Module): A Variscite i.MX 8M Mini running Yocto Linux, acting as the master controller
+- **Sensor Subsystem**: STM32 microcontroller managing temperature sensors, capacitance sensors (for presence), piezoelectric sensors, and vibration motors
+- **Frozen Subsystem**: STM32 microcontroller managing thermoelectric coolers, water pumps, and priming components
 
-![Diagram](images/main.svg)
+Eight Sleep's stock firmware runs three main programs on the SOM:
+- **DAC** (Device-API-Client): Communicates with Eight Sleep's servers
+- **Frank** (frankenfirmware): Controls both subsystems via USART
+- **Capybara**: Manages LEDs and Bluetooth setup
+
+opensleep replaces all three programs, communicating directly with the Sensor and Frozen subsystems via their USART protocols.
+
+For detailed technical information, see [BACKGROUND.md](BACKGROUND.md).
 
 ## Setup
-Before being able to setup and programs to run on Pod's SOM, you are going to need SSH access.
-This is NOT an easy mod to do and requires quite a bit of technical know how.
-For some Pods this requires specialized tooling.
 
-See [SETUP.md](SETUP.md)
+Setting up opensleep requires SSH access to the Pod's SOM, which involves hardware modification. This is **not trivial** and requires technical expertise. Some Pod variants require specialized tools.
 
-## MQTT Spec
-Please see [MQTT.md](MQTT.md)
+**Compatibility:**
+- ✅ **Pod 3**: Fully supported (the only version tested with opensleep)
+- ⚠️ **Pod 4/5**: Untested. SSH setup possible but Pod-specific features not implemented. If you'd like to help add support, please contact me.
+- ❌ **Pod 1/2**: Not possible
 
-## UI
-opensleep does not currently have a UI, however, you can easily build one in Home Assistant using MQTT. See [HASS.md](HASS.md)
+See detailed setup instructions in [SETUP.md](SETUP.md).
+
+## MQTT Integration
+
+opensleep exposes full control and monitoring through MQTT. You can:
+- Monitor presence, temperature, and sensor data in real-time
+- Adjust temperature profiles, alarms, and settings
+- Trigger actions like calibration (for presence detection)
+
+See the complete MQTT specification in [MQTT.md](MQTT.md).
+
+## Home Assistant
+
+opensleep integrates cleanly with Home Assistant via MQTT. You can build custom dashboards and automations.
+
+See Home Assistant configuration examples in [HASS.md](HASS.md).
 
 ![Home Assistant Dashboard](images/hass.png)
 
-
 ## Roadmap
- - [ ] Use Sensor's bed temperature readings to improve Frozen
- - [ ] Sleep Tracking: Heartrate, HRV, Breathing Rate
- - [ ] More advanced LED patterns using direct current level control
+
+- [ ] Use Sensor subsystem bed temperature readings to improve Frozen temperature control
+- [ ] Sleep Tracking: Heart rate, HRV, and breathing rate analysis
+- [ ] Advanced LED patterns using direct current level control
 
 ## Development
-Running in debug mode:
+
+Run in debug mode:
 ```bash
 RUST_LOG=debug,rumqttc=info ./opensleep
 ```
 
-## Footnotes
-If you encounter issues with this project please make an issue on this repository. For anything else please contact me at [mail@liamsnow.com](mailto:mail@liamsnow.com).
+(This prevents rumqttc from spamming logs)
 
-See more at [liamsnow.com](https://liamsnow.com/projects/opensleep)
+## Contact
+
+If you encounter issues, please open an issue on this repository. For other inquiries, contact me at [mail@liamsnow.com](mailto:mail@liamsnow.com).
+
