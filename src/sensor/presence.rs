@@ -43,7 +43,7 @@ impl PresenseManager {
                 let b = config_rx.borrow();
                 if b.presence.is_none() {
                     log::warn!(
-                        "No presence config found. Please calibrate using 'opensleep/command/calibrate' endpoint."
+                        "No presence config found. Please calibrate using 'opensleep/actions/calibrate' endpoint."
                     );
                 }
                 b.presence.as_ref().cloned()
